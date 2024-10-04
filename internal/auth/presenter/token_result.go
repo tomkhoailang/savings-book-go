@@ -1,6 +1,5 @@
-﻿package presenter
+package presenter
 
-type TokenResult struct {
+type ParseTokenResult struct {
 	UserId string
-	Username  string
 }

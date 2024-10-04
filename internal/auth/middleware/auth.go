@@ -1,4 +1,4 @@
-﻿package middleware
+package middleware
 
 import (
 	"errors"
@@ -8,8 +8,9 @@ import (
 	"SavingBooks/internal/auth"
 	"github.com/gin-gonic/gin"
 )
-func (mw *MiddleWareManager) JWTValidation() gin.HandlerFunc{
-	return func(c *gin.Context){
+
+func (mw *MiddleWareManager) JWTValidation() gin.HandlerFunc {
+	return func(c *gin.Context) {
 		authHeader := c.Request.Header.Get("Authorization")
 		if authHeader == "" {
 			c.AbortWithStatus(http.StatusUnauthorized)
@@ -25,7 +26,7 @@ func (mw *MiddleWareManager) JWTValidation() gin.HandlerFunc{
 			c.AbortWithStatus(http.StatusUnauthorized)
 			return
 		}
-		result, err := mw.authUC.ParseAccessToken(c.Request.Context(), headerParts[1])
+		result, err := mw.authUC.ParseAccessToken(headerParts[1])
 		if err != nil {
 			status := http.StatusInternalServerError
 			if errors.Is(err, auth.ErrInvalidAccessToken) {
@@ -34,7 +35,7 @@ func (mw *MiddleWareManager) JWTValidation() gin.HandlerFunc{
 			c.AbortWithStatus(status)
 			return
 		}
-		c.Set("userId",result.UserId)
+		c.Set("userId", result.UserId)
 		c.Next()
 	}
 }

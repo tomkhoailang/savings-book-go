@@ -1,14 +1,22 @@
-﻿package domain
+package domain
 
 import (
+	"time"
+
 	"golang.org/x/crypto/bcrypt"
 )
 
 type User struct {
-	AggregateRoot `bson:",inline" json:",inline"`
-	Username string `bson:"Username" json:"username"`
-	Password string `bson:"Password" json:"password"`
+	AggregateRoot         `bson:",inline" json:",inline"`
+	Username              string    `bson:"Username" json:"username"`
+	Password              string    `bson:"Password" json:"password"`
+	RefreshToken          string    `bson:"RefreshToken" json:"refresh_token"`
+	RefreshTokenExpiresAt time.Time `bson:"RefreshTokenExpiresAt" json:"refresh_token_expires_at"`
+}
 
+func (u *User) AssignRefreshToken(refreshToken string, expireAt time.Time) {
+	u.RefreshToken = refreshToken
+	u.RefreshTokenExpiresAt = expireAt
 }
 
 func (u *User) HashPassword() error {

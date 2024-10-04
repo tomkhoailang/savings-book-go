@@ -1,4 +1,4 @@
-﻿package repository
+package repository
 
 import (
 	"context"
@@ -8,17 +8,21 @@ import (
 	"SavingBooks/internal/auth"
 	"SavingBooks/internal/domain"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type userRepository struct {
-	db     *mongo.Client
-	cfg    *config.Configuration
+	db             *mongo.Client
+	cfg            *config.Configuration
 	collectionName string
 }
 
-func NewUserRepository(db *mongo.Client, cfg *config.Configuration) auth.UserRepository {
-	return &userRepository{db: db, cfg: cfg, collectionName: "User"}
+func (ur *userRepository) UpdateUser(ctx context.Context, user *domain.User) error {
+	collection := ur.db.Database(ur.cfg.DatabaseName).Collection(ur.collectionName)
+	var query = bson.M{"_id": user.Id}
+	_, err := collection.ReplaceOne(ctx, query, user)
+	return err
 }
 
 func (ur *userRepository) CreateUser(ctx context.Context, user *domain.User) error {
@@ -43,14 +47,21 @@ func (ur *userRepository) GetUserByUsername(ctx context.Context, username string
 
 func (ur *userRepository) GetUserById(ctx context.Context, id string) (*domain.User, error) {
 	collection := ur.db.Database(ur.cfg.DatabaseName).Collection(ur.collectionName)
-
 	var user domain.User
-	err := collection.FindOne(ctx, bson.M{"_id": id , "is_deleted" : false}).Decode(&user)
+
+	objectId, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return nil, err
+	}
+	err = collection.FindOne(ctx, bson.M{"_id": objectId, "IsDeleted": false}).Decode(&user)
 	if err != nil {
 		if errors.Is(err, mongo.ErrNoDocuments) {
-			return nil, nil
+			return nil, auth.ErrUserNotFound
 		}
 		return nil, err
 	}
 	return &user, nil
+}
+func NewUserRepository(db *mongo.Client, cfg *config.Configuration) auth.UserRepository {
+	return &userRepository{db: db, cfg: cfg, collectionName: "User"}
 }

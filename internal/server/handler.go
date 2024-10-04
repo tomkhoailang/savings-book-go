@@ -1,4 +1,4 @@
-﻿package server
+package server
 
 import (
 	"SavingBooks/internal/auth/middleware"
@@ -10,7 +10,6 @@ import (
 
 	testHttp "SavingBooks/internal/not-auth/delivery/http"
 
-
 	roleHttp "SavingBooks/internal/role/delivery/http"
 	roleRepo "SavingBooks/internal/role/repository"
 	roleUC "SavingBooks/internal/role/usecase"
@@ -20,7 +19,7 @@ func (s *Server) MapHandlers(g *gin.Engine) error {
 	userRepo := authRepo.NewUserRepository(s.db, s.cfg)
 	roleRepo := roleRepo.NewRoleRepository(s.db.Database(s.cfg.DatabaseName), "Roles")
 
-	authUC := authUC.NewAuthUseCase(userRepo, s.cfg.HashSalt, []byte(s.cfg.JwtSecret), s.cfg.TokenDuration)
+	authUC := authUC.NewAuthUseCase(userRepo, s.cfg.HashSalt, []byte(s.cfg.JwtSecret), s.cfg.TokenDuration, s.cfg.RefreshTokenDuration)
 	roleUc := roleUC.NewRoleUseCase(roleRepo)
 
 	authHandler := authHttp.NewAuthHandler(authUC)
@@ -34,7 +33,7 @@ func (s *Server) MapHandlers(g *gin.Engine) error {
 
 	mw := middleware.NewMiddleWareManager(authUC)
 
-	authHttp.MapAuthRoutes(authGroup, authHandler)
+	authHttp.MapAuthRoutes(authGroup, authHandler, mw)
 	testHttp.MapAuthRoutes(testGroup, authHandler, mw)
 	roleHttp.MapAuthRoutes(roleGorup, roleHandler, mw)
 	return nil
