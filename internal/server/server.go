@@ -28,6 +28,17 @@ type Server struct {
 func NewServer( cfg *config.Configuration, db *mongo.Client, logger *logrus.Logger, ready chan bool) *Server {
 	return &Server{gin: gin.New(), cfg: cfg, db: db, logger: logger, ready: ready}
 }
+//func CustomRecovery() gin.HandlerFunc {
+//	return func(c *gin.Context) {
+//		defer func() {
+//			if err := recover(); err != nil {
+//				c.JSON(http.StatusInternalServerError, gin.H{"Error": err})
+//				c.Abort()
+//			}
+//		}()
+//		c.Next()
+//	}
+//}
 func (s *Server) Run() error {
 
 	s.gin.Use(gin.Logger())
@@ -55,9 +66,6 @@ func (s *Server) Run() error {
 	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
 
 	go func() {
-		//if err := server.ListenAndServeTLS("./self_cert/server.pem", "./self_cert/server.key"); err != nil && !errors.Is(err, http.ErrServerClosed) {
-		//	fmt.Printf("Error closed: %s\n", err)
-		//}
 		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			fmt.Printf("Error closed: %s\n", err)
 		}

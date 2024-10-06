@@ -1,6 +1,9 @@
 ﻿package server
 
 import (
+	"context"
+	"fmt"
+
 	"SavingBooks/internal/auth/middleware"
 	"github.com/gin-gonic/gin"
 
@@ -17,10 +20,18 @@ import (
 )
 
 func (s *Server) MapHandlers(g *gin.Engine) error {
-	userRepo := authRepo.NewUserRepository(s.db, s.cfg)
-	roleRepo := roleRepo.NewRoleRepository(s.db.Database(s.cfg.DatabaseName), "Roles")
+	db := s.db.Database(s.cfg.DatabaseName)
 
-	authUC := authUC.NewAuthUseCase(userRepo, s.cfg.HashSalt, []byte(s.cfg.JwtSecret), s.cfg.TokenDuration)
+
+	userRepo := authRepo.NewUserRepository(db,"Users")
+	roleRepo := roleRepo.NewRoleRepository(db, "Roles")
+	ctx := context.Background()
+	if err := roleRepo.SeedRole(ctx); err != nil {
+		fmt.Println("Something wrong with seed roles")
+		return err
+	}
+
+	authUC := authUC.NewAuthUseCase(userRepo, roleRepo, s.cfg.HashSalt, []byte(s.cfg.JwtSecret), s.cfg.TokenDuration)
 	roleUc := roleUC.NewRoleUseCase(roleRepo)
 
 	authHandler := authHttp.NewAuthHandler(authUC)

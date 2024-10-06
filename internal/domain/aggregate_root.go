@@ -14,11 +14,11 @@ type AggregateRoot struct {
 	CreatorId        primitive.ObjectID `bson:"CreatorId,omitempty" json:"creatorId"`
 
 	LastModificationTime time.Time          `bson:"LastModificationTime" json:"lastModificationTime"`
-	LastModifierId       primitive.ObjectID `bson:"LastModifierId,omitempty" json:"lastModifierId"`
+	LastModifierId       primitive.ObjectID `bson:"LastModifierId" json:"lastModifierId"`
 
 	IsDeleted    bool               `bson:"IsDeleted" json:"isDeleted"`
 	DeletionTime time.Time          `bson:"DeletionTime" json:"deletionTime"`
-	DeleterId    primitive.ObjectID `bson:"DeleterId,omitempty" json:"deleterId"`
+	DeleterId    primitive.ObjectID `bson:"DeleterId" json:"deleterId"`
 
 	IsActive bool   `bson:"IsActive" json:"isActive"`
 	Keyword  string `bson:"Keyword" json:"keyword"`

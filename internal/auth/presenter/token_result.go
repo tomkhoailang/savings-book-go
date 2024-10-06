@@ -2,5 +2,5 @@
 
 type TokenResult struct {
 	UserId string
-	Username  string
+	Roles []string
 }

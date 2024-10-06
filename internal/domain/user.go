@@ -1,6 +1,7 @@
 ﻿package domain
 
 import (
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -8,7 +9,7 @@ type User struct {
 	AggregateRoot `bson:",inline" json:",inline"`
 	Username string `bson:"Username" json:"username"`
 	Password string `bson:"Password" json:"password"`
-
+	RoleIds []primitive.ObjectID `bson:"RoleIds" json:"rolesIds"`
 }
 
 func (u *User) HashPassword() error {

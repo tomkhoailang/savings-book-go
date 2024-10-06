@@ -6,9 +6,12 @@ import (
 
 type GenericRepository[T any] interface {
 	Get(ctx context.Context, id string) (*T, error)
+	GetMany(ctx context.Context, ids []string) (*[]T, error)
+	GetByField(ctx context.Context, field string, value interface{}) (*T, error)
 	Create(ctx context.Context, entity *T) error
-	Update(ctx context.Context, id string, entity *T) error
-	Delete(ctx context.Context, id string, deleterId string) error
-	DeleteMany(ctx context.Context, ids []string, deleterId string) error
+	Update(ctx context.Context, entity *T, id string) error
+	Delete(ctx context.Context, deleterId string, id string) error
+	DeleteMany(ctx context.Context, deleterId string, ids []string) error
 	GetList(ctx context.Context, query interface{}) (interface{}, error)
+	CountAll(ctx context.Context) (int, error)
 }
