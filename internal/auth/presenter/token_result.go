@@ -1,5 +1,6 @@
 package presenter
 
-type ParseTokenResult struct {
+type TokenResult struct {
 	UserId string
+	Roles []string
 }

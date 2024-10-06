@@ -3,10 +3,12 @@
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"SavingBooks/internal/domain"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
@@ -16,18 +18,43 @@ type BaseRepository[T any] struct {
 	dbName         string
 }
 
-func NewBaseRepository[T any](db *mongo.Database, collectionName string) domain.GenericRepository[T]  {
-	return &BaseRepository[T]{db: db, collectionName: collectionName}
-}
 
 func (r *BaseRepository[T]) Get(ctx context.Context, id string) (*T, error) {
 	collection := r.db.Collection(r.collectionName)
 	var entity T
-	err := collection.FindOne(ctx, bson.M{"_id": id}).Decode(&entity)
+
+	objectId, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
-		if errors.Is(err, mongo.ErrNoDocuments) {
-			return nil, nil
-		}
+		return nil, err
+	}
+	err = collection.FindOne(ctx, bson.M{"_id": objectId}).Decode(&entity)
+	if err != nil {
+		return nil, err
+	}
+	return &entity, nil
+}
+func (r *BaseRepository[T]) GetByField(ctx context.Context, field string, value interface{}) (*T, error) {
+	collection := r.db.Collection(r.collectionName)
+	var entity T
+
+	var queryValue interface{}
+	switch v := value.(type) {
+	case string:
+		queryValue = v
+	case int:
+		queryValue = v
+	case int64:
+		queryValue = v
+	case float64:
+		queryValue = v
+	case bool:
+		queryValue = v
+	default:
+		return nil, fmt.Errorf("unsupported value type: %T", v)
+	}
+
+	err := collection.FindOne(ctx, bson.M{field: queryValue}).Decode(&entity)
+	if err != nil {
 		return nil, err
 	}
 	return &entity, nil
@@ -39,13 +66,21 @@ func (r *BaseRepository[T]) Create(ctx context.Context, entity *T) error {
 	return err
 }
 
-func (r *BaseRepository[T]) Update(ctx context.Context, id string, entity *T) error {
+func (r *BaseRepository[T]) Update(ctx context.Context, entity *T, id string) error {
 	collection := r.db.Collection(r.collectionName)
-	filter := bson.M{"_id": id}
-	_, err := collection.ReplaceOne(ctx, filter, entity)
+
+	objectId, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return errors.New("invalid ObjectID: " + id)
+	}
+	filter := bson.M{"_id": objectId}
+	result, err := collection.ReplaceOne(ctx, filter, entity)
+	if result.ModifiedCount == 0 {
+		return DocumentNotFound
+	}
 	return err
 }
-func (r *BaseRepository[T]) Delete(ctx context.Context, id string, deleterId string) error {
+func (r *BaseRepository[T]) Delete(ctx context.Context, deleterId string, id string) error {
 	collection := r.db.Collection(r.collectionName)
 	filter := bson.M{"_id": id}
 	update := bson.M{
@@ -58,9 +93,21 @@ func (r *BaseRepository[T]) Delete(ctx context.Context, id string, deleterId str
 	_, err := collection.UpdateOne(ctx, filter, update)
 	return err
 }
-func (r *BaseRepository[T]) DeleteMany(ctx context.Context, ids []string, deleterId string) error {
+func (r *BaseRepository[T]) DeleteMany(ctx context.Context, deleterId string, ids []string) error {
 	collection := r.db.Collection(r.collectionName)
-	filter := bson.M{"_id": bson.M{"$in": ids}}
+
+	var objectIDs []primitive.ObjectID
+
+	// Convert string IDs to ObjectIDs
+	for _, idStr := range ids {
+		objectID, err := primitive.ObjectIDFromHex(idStr)
+		if err != nil {
+			return errors.New("invalid ObjectID: " + idStr)
+		}
+		objectIDs = append(objectIDs, objectID)
+	}
+
+	filter := bson.M{"_id": bson.M{"$in": objectIDs}, "IsDeleted": false}
 	update := bson.M{
 		"$set": bson.M{
 			"DeletionTime": time.Now(),
@@ -68,8 +115,19 @@ func (r *BaseRepository[T]) DeleteMany(ctx context.Context, ids []string, delete
 			"DeleterId":   deleterId,
 		},
 	}
-	_, err := collection.UpdateMany(ctx, filter, update)
+	result, err := collection.UpdateMany(ctx, filter, update)
+	if result != nil && result.ModifiedCount == 0 {
+		return DocumentNotFound
+	}
 	return err
+}
+func (r *BaseRepository[T]) CountAll(ctx context.Context) (int, error) {
+	collection := r.db.Collection(r.collectionName)
+	totalCount, err := collection.CountDocuments(ctx, bson.M{})
+	if err != nil {
+		return -1, err
+	}
+	return int(totalCount),nil
 }
 func (r *BaseRepository[T]) GetList(ctx context.Context, query interface{}) (interface{}, error) {
 	collection := r.db.Collection(r.collectionName)
@@ -77,6 +135,9 @@ func (r *BaseRepository[T]) GetList(ctx context.Context, query interface{}) (int
 	filter, options := query.(*Query).QueryBuilder()
 
 	totalCount, err := collection.CountDocuments(ctx, filter)
+	if err != nil {
+		return nil, err
+	}
 
 	cursor, err := collection.Find(ctx, filter, options)
 	if err != nil {
@@ -94,4 +155,32 @@ func (r *BaseRepository[T]) GetList(ctx context.Context, query interface{}) (int
 	}
 
 	return queryResult, nil
+}
+func (r *BaseRepository[T]) GetMany(ctx context.Context, ids []string) (*[]T, error) {
+	collection := r.db.Collection(r.collectionName)
+
+	var objectIds []primitive.ObjectID
+	for _, id := range ids {
+		objectId, err := primitive.ObjectIDFromHex(id)
+		if err != nil {
+			return nil, errors.New("invalid ObjectID: " + id)
+		}
+		objectIds = append(objectIds, objectId)
+	}
+	filter := bson.M{"_id": bson.M{"$in": objectIds}}
+
+	cursor, err := collection.Find(ctx, filter)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+	var entities []T
+	if err := cursor.All(ctx, &entities); err != nil {
+		return nil, err
+	}
+	return &entities, nil
+}
+
+func NewBaseRepository[T any](db *mongo.Database, collectionName string) domain.GenericRepository[T]  {
+	return &BaseRepository[T]{db: db, collectionName: collectionName}
 }

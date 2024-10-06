@@ -8,5 +8,5 @@ import (
 
 type RoleRepository interface {
 	domain.GenericRepository[domain.Role]
-	TestMethod(ctx context.Context, id string) (*domain.Role, error)
+	SeedRole(ctx context.Context) error
 }

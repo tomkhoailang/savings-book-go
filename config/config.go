@@ -18,7 +18,7 @@ type Configuration struct {
 }
 
 func NewConfig() *Configuration {
-	err := godotenv.Load()
+	err := godotenv.Load(".env")
 
 	if err != nil {
 		log.Println("No .env file could be found: ", err)

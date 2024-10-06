@@ -1,6 +1,6 @@
 ﻿package presenter
 
 type RoleInput struct {
-	Name string `json:"name" validate:"required,min=2"`
+	Name string `json:"name" validate:"required"`
 	Description string `json:"description" validate:"required"`
 }
