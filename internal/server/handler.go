@@ -31,7 +31,7 @@ func (s *Server) MapHandlers(g *gin.Engine) error {
 		return err
 	}
 
-	authUC := authUC.NewAuthUseCase(userRepo, roleRepo, s.cfg.HashSalt, []byte(s.cfg.JwtSecret), s.cfg.TokenDuration)
+	authUC := authUC.NewAuthUseCase(userRepo, roleRepo, s.cfg.HashSalt, []byte(s.cfg.JwtSecret), s.cfg.TokenDuration, s.cfg.RefreshTokenDuration)
 	roleUc := roleUC.NewRoleUseCase(roleRepo)
 
 	authHandler := authHttp.NewAuthHandler(authUC)
