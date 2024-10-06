@@ -1,4 +1,4 @@
-﻿package server
+package server
 
 import (
 	"context"
@@ -45,7 +45,7 @@ func (s *Server) MapHandlers(g *gin.Engine) error {
 
 	mw := middleware.NewMiddleWareManager(authUC)
 
-	authHttp.MapAuthRoutes(authGroup, authHandler)
+	authHttp.MapAuthRoutes(authGroup, authHandler, mw)
 	testHttp.MapAuthRoutes(testGroup, authHandler, mw)
 	roleHttp.MapAuthRoutes(roleGorup, roleHandler, mw)
 	return nil

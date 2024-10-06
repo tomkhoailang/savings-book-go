@@ -1,4 +1,4 @@
-﻿package presenter
+package presenter
 
 type TokenResult struct {
 	UserId string

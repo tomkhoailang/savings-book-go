@@ -2,6 +2,8 @@
 
 import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"time"
+
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -10,6 +12,13 @@ type User struct {
 	Username string `bson:"Username" json:"username"`
 	Password string `bson:"Password" json:"password"`
 	RoleIds []primitive.ObjectID `bson:"RoleIds" json:"rolesIds"`
+	RefreshToken          string    `bson:"RefreshToken" json:"refresh_token"`
+	RefreshTokenExpiresAt time.Time `bson:"RefreshTokenExpiresAt" json:"refresh_token_expires_at"`
+}
+
+func (u *User) AssignRefreshToken(refreshToken string, expireAt time.Time) {
+	u.RefreshToken = refreshToken
+	u.RefreshTokenExpiresAt = expireAt
 }
 
 func (u *User) HashPassword() error {

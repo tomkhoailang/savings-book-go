@@ -1,4 +1,4 @@
-﻿package config
+package config
 
 import (
 	"log"
@@ -11,6 +11,7 @@ type Configuration struct {
 	Port                  string `env:"PORT" envDefault:"8080"`
 	HashSalt              string `env:"HASH_SALT"`
 	TokenDuration         int64  `env:"TOKEN_DURATION"`
+	RefreshTokenDuration  int64  `env:"REFRESH_TOKEN_DURATION"`
 	JwtSecret             string `env:"JWT_SECRET"`
 	DatabaseConnectionURL string `env:"CONNECTION_URL"`
 	DatabaseName          string `env:"DB_NAME"`
@@ -20,7 +21,7 @@ func NewConfig() *Configuration {
 	err := godotenv.Load(".env")
 
 	if err != nil {
-		log.Printf("No .env file could be found")
+		log.Println("No .env file could be found: ", err)
 	}
 	var cfg Configuration
 	err = env.Parse(&cfg)
