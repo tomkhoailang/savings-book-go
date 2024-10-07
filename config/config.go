@@ -15,6 +15,8 @@ type Configuration struct {
 	JwtSecret             string `env:"JWT_SECRET"`
 	DatabaseConnectionURL string `env:"CONNECTION_URL"`
 	DatabaseName          string `env:"DB_NAME"`
+	ClientId              string `env:"ClientId"`
+	ClientSecret          string `env:"ClientSecret"`
 }
 
 func NewConfig() *Configuration {
