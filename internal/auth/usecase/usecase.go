@@ -37,7 +37,7 @@ func (a *authUserCase) Logout(ctx context.Context, userId string) error {
 		return err
 	}
 	user.AssignRefreshToken(uuid.New().String(), time.Now().Add(a.refreshTokenDuration))
-	err = a.userRepo.Update(ctx, user, user.Id.Hex())
+	_, err = a.userRepo.Update(ctx, user, user.Id.Hex(), nil)
 	if err != nil {
 		return err
 	}
@@ -55,7 +55,8 @@ func (a *authUserCase) RenewAccessToken(ctx context.Context, req *presenter.Rene
 	if user.RefreshTokenExpiresAt.Before(time.Now()) {
 		return "", auth.ErrRefreshTokenExpired
 	}
-	token, err := a.generateAccessToken(user)
+	rolesName, err := a.getRolesName(ctx, user.RoleIds)
+	token, err := a.generateAccessToken(user,rolesName)
 	if err != nil {
 		return "", err
 
@@ -109,25 +110,14 @@ func (a *authUserCase) SignIn(ctx context.Context, creds presenter.LoginInput) (
 	if !user.ComparePassword(creds.Password) {
 		return nil, auth.ErrWrongPassword
 	}
-	var idsString = make([]string, len(user.RoleIds))
-	for i,id := range user.RoleIds {
-		idsString[i] = id.Hex()
-	}
-	roles, err := a.roleRepo.GetMany(ctx, idsString)
-	if err != nil {
-		return nil, err
-	}
-	var rolesName = make([]string, len(*roles))
-	for i, role := range *roles {
-		rolesName[i] = role.Name
-	}
+	rolesName, err := a.getRolesName(ctx, user.RoleIds)
 	refreshToken := uuid.New().String()
 	user.AssignRefreshToken(refreshToken, time.Now().Add(a.refreshTokenDuration))
-	err = a.userRepo.Update(ctx, user, user.Id.Hex())
+	_, err = a.userRepo.Update(ctx, user, user.Id.Hex(), []string{"RefreshToken","RefreshTokenExpiresAt"})
 	if err != nil {
 		return nil, err
 	}
-	tokenString, err := a.generateAccessToken(user)
+	tokenString, err := a.generateAccessToken(user,rolesName)
 
 	if err != nil {
 		return nil, err
@@ -168,7 +158,7 @@ func NewAuthUseCase(userRepo auth.UserRepository, roleRepo role.RoleRepository, 
 	}
 }
 
-func (a *authUserCase) generateAccessToken(user *domain.User) (string, error) {
+func (a *authUserCase) generateAccessToken(user *domain.User, rolesName []string) (string, error) {
 	accessClaims := AuthClaims{
 		Username: user.Username,
 		UserId:   user.Id,
@@ -177,6 +167,7 @@ func (a *authUserCase) generateAccessToken(user *domain.User) (string, error) {
 			Issuer:    "saving-books",
 			ExpiresAt: time.Now().Add(a.accessTokenDuration).Unix(),
 		},
+		Roles: rolesName,
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, accessClaims)
 
@@ -185,4 +176,19 @@ func (a *authUserCase) generateAccessToken(user *domain.User) (string, error) {
 		return "", err
 	}
 	return tokenString, err
+}
+func (a *authUserCase) getRolesName(ctx context.Context, roleIds []primitive.ObjectID) ([]string, error) {
+	var idsString = make([]string, len(roleIds))
+	for i,id := range roleIds {
+		idsString[i] = id.Hex()
+	}
+	roles, err := a.roleRepo.GetMany(ctx, idsString)
+	if err != nil {
+		return nil, err
+	}
+	var rolesName = make([]string, len(*roles))
+	for i, role := range *roles {
+		rolesName[i] = role.Name
+	}
+	return rolesName, nil
 }

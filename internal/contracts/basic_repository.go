@@ -4,12 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 	"time"
 
 	"SavingBooks/internal/domain"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type BaseRepository[T any] struct {
@@ -65,20 +67,44 @@ func (r *BaseRepository[T]) Create(ctx context.Context, entity *T) error {
 	_, err := collection.InsertOne(ctx, entity)
 	return err
 }
+func (r *BaseRepository[T]) GetCollection() *mongo.Collection {
+	collection := r.db.Collection(r.collectionName)
+	return collection
+}
 
-func (r *BaseRepository[T]) Update(ctx context.Context, entity *T, id string) error {
+func (r *BaseRepository[T]) Update(ctx context.Context, entity *T, id string, fieldsToUpdate []string) (*T, error) {
 	collection := r.db.Collection(r.collectionName)
 
 	objectId, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
-		return errors.New("invalid ObjectID: " + id)
+		return nil, errors.New("invalid ObjectID: " + id)
 	}
 	filter := bson.M{"_id": objectId}
-	result, err := collection.ReplaceOne(ctx, filter, entity)
-	if result.ModifiedCount == 0 {
-		return DocumentNotFound
+	fieldsToUpdate = append(fieldsToUpdate,"LastModifierId", "LastModificationTime", "Keyword", "IsActive")
+	updateFields := bson.M{}
+
+	val := reflect.ValueOf(entity).Elem()
+	for _, field := range fieldsToUpdate {
+		fieldValue := val.FieldByName(field)
+		if fieldValue.IsValid() {
+			updateFields[field] = fieldValue.Interface()
+		}
 	}
-	return err
+	if len(updateFields) == 0 {
+		return nil, errors.New("no valid fields to update")
+	}
+	update := bson.M{"$set": updateFields}
+	opts := options.FindOneAndUpdate().SetReturnDocument(options.After)
+	var updatedEntity T
+
+	err = collection.FindOneAndUpdate(ctx, filter, update, opts).Decode(&updatedEntity)
+	if err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return nil, DocumentNotFound
+		}
+		return nil, err
+	}
+	return &updatedEntity, err
 }
 func (r *BaseRepository[T]) Delete(ctx context.Context, deleterId string, id string) error {
 	collection := r.db.Collection(r.collectionName)

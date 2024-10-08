@@ -9,7 +9,7 @@ type GenericRepository[T any] interface {
 	GetMany(ctx context.Context, ids []string) (*[]T, error)
 	GetByField(ctx context.Context, field string, value interface{}) (*T, error)
 	Create(ctx context.Context, entity *T) error
-	Update(ctx context.Context, entity *T, id string) error
+	Update(ctx context.Context, entity *T, id string, fieldsToUpdate []string) (*T, error)
 	Delete(ctx context.Context, deleterId string, id string) error
 	DeleteMany(ctx context.Context, deleterId string, ids []string) error
 	GetList(ctx context.Context, query interface{}) (interface{}, error)

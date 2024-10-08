@@ -15,14 +15,14 @@ type roleUseCase struct {
 }
 
 
-func (r *roleUseCase) GetListRoles(ctx context.Context, query *contracts.Query) (contracts.QueryResult[domain.Role], error) {
+func (r *roleUseCase) GetListRoles(ctx context.Context, query *contracts.Query) (*contracts.QueryResult[domain.Role], error) {
 	rolesInterface, err := r.roleRepo.GetList(ctx, query)
 	if err != nil {
-		return contracts.QueryResult[domain.Role]{}, err
+		return nil, err
 	}
 	roles := rolesInterface.(*contracts.QueryResult[domain.Role])
 
-	return *roles, nil
+	return roles, nil
 }
 
 func (r *roleUseCase) CreateRole(ctx context.Context, input *presenter.RoleInput, creatorId string) (*domain.Role, error) {
@@ -51,7 +51,7 @@ func (r *roleUseCase) UpdateRole(ctx context.Context, input *presenter.RoleInput
 	entity.Keyword = input.Name + " " + input.Description
 	entity.SetUpdate(lastModifierId)
 
-	err = r.roleRepo.Update(ctx, entity, roleId)
+	entity, err = r.roleRepo.Update(ctx, entity, roleId, []string{"Name", "Description"})
 	if err != nil {
 		return nil, err
 	}
