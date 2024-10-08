@@ -170,7 +170,7 @@ func HandleDeleteManyRequest[T any](deleteFunc func(ctx context.Context, userId 
 		return
 	}
 }
-func HandleGetListRequest[T any](getListFunc func(ctx context.Context, query *contracts.Query ) (contracts.QueryResult[T], error)) gin.HandlerFunc {
+func HandleGetListRequest[T any](getListFunc func(ctx context.Context, query *contracts.Query ) (*contracts.QueryResult[T], error)) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var query contracts.Query
 		if err := c.ShouldBindQuery(&query); err != nil {
