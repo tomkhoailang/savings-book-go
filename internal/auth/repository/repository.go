@@ -8,12 +8,12 @@ import (
 )
 
 type userRepository struct {
-	contracts.BaseRepository[domain.User]
+	domain.GenericRepository[domain.User]
 }
 
 func NewUserRepository(db *mongo.Database, collectionName string) auth.UserRepository {
 	baseRepo := contracts.NewBaseRepository[domain.User](db, collectionName).(*contracts.BaseRepository[domain.User])
-	return &userRepository{BaseRepository: *baseRepo}
+	return &userRepository{GenericRepository: baseRepo}
 }
 
 //func (ur *userRepository) CreateUser(ctx context.Context, user *domain.User) error {

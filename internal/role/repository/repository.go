@@ -11,7 +11,7 @@ import (
 )
 
 type roleRepository struct {
-	contracts.BaseRepository[domain.Role]
+	domain.GenericRepository[domain.Role]
 }
 
 func (r *roleRepository) SeedRole(ctx context.Context) error {
@@ -40,7 +40,7 @@ func (r *roleRepository) SeedRole(ctx context.Context) error {
 
 func NewRoleRepository(db *mongo.Database, collectionName string) role.RoleRepository {
 	baseRepo := contracts.NewBaseRepository[domain.Role](db, collectionName).(*contracts.BaseRepository[domain.Role])
-	return &roleRepository{BaseRepository: *baseRepo }
+	return &roleRepository{GenericRepository: baseRepo }
 }
 
 
