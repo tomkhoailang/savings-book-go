@@ -7,7 +7,7 @@ import (
 )
 
 type PaymentUseCase interface {
-	SendPayout(ctx context.Context, payoutRequest *paypal.PayoutRequest) (*paypal.PayoutBatchResponse, error)
+	SendPayout(ctx context.Context, payoutRequest *paypal.UCPayoutRequest) (*paypal.PayoutBatchResponse, error)
 	CreateOrder(ctx context.Context, orderRequest *paypal.InitOrderRequest) (*paypal.PayPalOrderResponse, error)
 	CaptureOrder(ctx context.Context, orderId string) (*paypal.PayPalCaptureResponse, error)
 }

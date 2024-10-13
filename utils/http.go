@@ -86,6 +86,7 @@ func HandleCreateRequest[TInput any, TOutput any, TEntity any](createFunc func(c
 		}
 		userId, err := GetUserId(c)
 		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
 		entity, err := createFunc(c.Request.Context(), &input, userId)

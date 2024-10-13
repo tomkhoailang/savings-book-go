@@ -23,7 +23,7 @@ type paymentUseCase struct {
 	httpClient *http.Client
 }
 
-func (p *paymentUseCase) SendPayout(ctx context.Context, payoutRequest *paypal.PayoutRequest) (*paypal.PayoutBatchResponse, error) {
+func (p *paymentUseCase) SendPayout(ctx context.Context, payoutRequest *paypal.UCPayoutRequest) (*paypal.PayoutBatchResponse, error) {
 	token, err := p.getPaypalToken()
 	if err != nil {
 		return nil, err
@@ -38,11 +38,11 @@ func (p *paymentUseCase) SendPayout(ctx context.Context, payoutRequest *paypal.P
 			{
 				RecipientType: "EMAIL",
 				Amount: paypal.PayoutAmount{
-					Value: "9.87", Currency: "USD" ,
+					Value: fmt.Sprintf("%.2f", payoutRequest.Amount), Currency: "USD" ,
 				},
 				Note: "Thanks for your patronage!",
 				SenderItemID: fmt.Sprintf("Batch_%s",time.Now().Format("20060102 150405")),
-				Receiver: "sb-cji7p32764589@personal.example.com",
+				Receiver: payoutRequest.Email,
 				NotificationLanguage: "en-US",
 			},
 		},

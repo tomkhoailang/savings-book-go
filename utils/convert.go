@@ -8,3 +8,6 @@ func SliceToMap[T comparable](slice []T) map[T]struct{} {
 	}
 	return m
 }
+
+
+

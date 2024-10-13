@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"SavingBooks/config"
+	"SavingBooks/internal/services/kafka"
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -28,21 +29,13 @@ type Server struct {
 func NewServer( cfg *config.Configuration, db *mongo.Client, logger *logrus.Logger, ready chan bool) *Server {
 	return &Server{gin: gin.New(), cfg: cfg, db: db, logger: logger, ready: ready}
 }
-//func CustomRecovery() gin.HandlerFunc {
-//	return func(c *gin.Context) {
-//		defer func() {
-//			if err := recover(); err != nil {
-//				c.JSON(http.StatusInternalServerError, gin.H{"Error": err})
-//				c.Abort()
-//			}
-//		}()
-//		c.Next()
-//	}
-//}
+
+
+
 func (s *Server) Run() error {
 
 	s.gin.Use(gin.Logger())
-	s.gin.Use(gin.Recovery())
+	s.gin.Use(CustomRecoveryMiddleware())
 
 	server := &http.Server{
 		Addr: ":" + s.cfg.Port,
@@ -53,8 +46,8 @@ func (s *Server) Run() error {
 			InsecureSkipVerify: true,
 		},
 	}
-
-	if err:= s.MapHandlers(s.gin); err != nil {
+	savingBookUC, err := s.MapHandlers(s.gin);
+	if err != nil {
 		return  err
 	}
 
@@ -71,6 +64,12 @@ func (s *Server) Run() error {
 		}
 	}()
 	fmt.Printf("Server is listening on %s\n", server.Addr)
+
+	kafkaConsumer := kafka.NewKafkaConsumer("localhost:9092","saving-book",savingBookUC);
+	if err := kafkaConsumer.StartListening(); err != nil {
+		return err
+	}
+
 	<-quit
 	_, shutdown := context.WithTimeout(context.Background(), time.Second * 2)
 	defer shutdown()

@@ -21,7 +21,7 @@ func (r *roleRepository) SeedRole(ctx context.Context) error {
 		return err
 	}
 	if count > 0 {
-		print("No need to seed role")
+		println("No need to seed role")
 		return nil
 	}
 

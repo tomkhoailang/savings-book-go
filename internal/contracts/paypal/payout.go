@@ -1,5 +1,9 @@
 ﻿package paypal
 
+type UCPayoutRequest struct {
+	Amount float64 `json:"amount" validate:"required,min=1"`
+	Email  string  `json:"email" validate:"required,email"`
+}
 type PaypalTokenResponse struct {
 	Scope       string `json:"scope"`
 	AccessToken string `json:"access_token"`
@@ -14,12 +18,12 @@ type PayoutRequest struct {
 }
 
 type PayoutItem struct {
-	RecipientType       string       `json:"recipient_type"`
-	Amount              PayoutAmount `json:"amount"`
-	Note                string       `json:"note"`
-	SenderItemID        string       `json:"sender_item_id"`
-	Receiver            string       `json:"receiver"`
-	NotificationLanguage string      `json:"notification_language"`
+	RecipientType        string       `json:"recipient_type"`
+	Amount               PayoutAmount `json:"amount"`
+	Note                 string       `json:"note"`
+	SenderItemID         string       `json:"sender_item_id"`
+	Receiver             string       `json:"receiver"`
+	NotificationLanguage string       `json:"notification_language"`
 }
 type PayoutAmount struct {
 	Value    string `json:"value"`

@@ -41,7 +41,7 @@ func (p *paymentHandler) TestCreateOrder() gin.HandlerFunc {
 func (p *paymentHandler) TestSendPayout() gin.HandlerFunc {
 	return func(c *gin.Context) {
 
-		payload := &paypal.PayoutRequest{
+		payload := &paypal.UCPayoutRequest{
 		}
 		res,err := p.paymentUC.SendPayout(c,payload)
 		if err != nil {
