@@ -20,6 +20,11 @@ func NewKafkaProducer(broker string) *KafkaProducer {
 
 func (p *KafkaProducer) SendMessage(topic string, value []byte) error {
 
+	_, err := kafka.DialLeader(context.Background(), "tcp", p.Broker, topic, 0)
+	if err != nil {
+		panic(err.Error())
+	}
+
 	const maxRetries = 3
 	const retryDelay = 1 * time.Second
 

@@ -13,6 +13,7 @@ import (
 
 	"SavingBooks/config"
 	"SavingBooks/internal/services/kafka"
+	"SavingBooks/internal/services/websocket"
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -24,6 +25,7 @@ type Server struct {
 	db *mongo.Client
 	logger *logrus.Logger
 	ready chan bool
+	hub *websocket.Hub
 }
 
 func NewServer( cfg *config.Configuration, db *mongo.Client, logger *logrus.Logger, ready chan bool) *Server {
@@ -46,6 +48,7 @@ func (s *Server) Run() error {
 			InsecureSkipVerify: true,
 		},
 	}
+	s.hub = websocket.NewHub()
 	savingBookUC, err := s.MapHandlers(s.gin);
 	if err != nil {
 		return  err
@@ -69,6 +72,9 @@ func (s *Server) Run() error {
 	if err := kafkaConsumer.StartListening(); err != nil {
 		return err
 	}
+	s.hub.Run()
+
+
 
 	<-quit
 	_, shutdown := context.WithTimeout(context.Background(), time.Second * 2)

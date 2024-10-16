@@ -7,6 +7,7 @@ import (
 	"SavingBooks/internal/auth/middleware"
 	saving_book "SavingBooks/internal/saving-book"
 	kafka2 "SavingBooks/internal/services/kafka"
+	"SavingBooks/internal/services/websocket"
 	"github.com/gin-gonic/gin"
 
 	authHttp "SavingBooks/internal/auth/delivery/http"
@@ -39,6 +40,8 @@ import (
 
 func (s *Server) MapHandlers(g *gin.Engine) (saving_book.UseCase, error) {
 	db := s.db.Database(s.cfg.DatabaseName)
+	//s.hub = websocket.NewHub()
+	//s.hub.Run()
 
 
 	userRepo := authRepo.NewUserRepository(db,"Users")
@@ -52,7 +55,8 @@ func (s *Server) MapHandlers(g *gin.Engine) (saving_book.UseCase, error) {
 
 	kafkaProducer := kafka2.NewKafkaProducer("localhost:9092")
 
-	testUC := testUC.NewTestServiceUseCase(kafkaProducer)
+
+	testUC := testUC.NewTestServiceUseCase(kafkaProducer, s.hub)
 	authUC := authUC.NewAuthUseCase(userRepo, roleRepo, s.cfg.HashSalt, []byte(s.cfg.JwtSecret), s.cfg.TokenDuration, s.cfg.RefreshTokenDuration)
 	roleUc := roleUC.NewRoleUseCase(roleRepo)
 	paymentUC := paymentUC.NewPaymentUseCase(s.cfg.ClientId, s.cfg.ClientSecret)
@@ -69,6 +73,7 @@ func (s *Server) MapHandlers(g *gin.Engine) (saving_book.UseCase, error) {
 
 
 
+
 	v1 := g.Group("/api/v1")
 	authGroup := v1.Group("/auth")
 	testGroup := v1.Group("/test")
@@ -76,8 +81,11 @@ func (s *Server) MapHandlers(g *gin.Engine) (saving_book.UseCase, error) {
 	paymentGroup := v1.Group("/payment")
 	regulationGroup := v1.Group("/regulation")
 	savingBookGroup := v1.Group("/saving-book")
+	socketGroup := v1.Group("/ws")
+
 
 	mw := middleware.NewMiddleWareManager(authUC)
+
 
 	authHttp.MapAuthRoutes(authGroup, authHandler, mw)
 	testHttp.MapAuthRoutes(testGroup, testHandler, mw)
@@ -85,6 +93,7 @@ func (s *Server) MapHandlers(g *gin.Engine) (saving_book.UseCase, error) {
 	paymentHttp.MapAuthRoutes(paymentGroup, paymentHandler)
 	regulationHttp.MapAuthRoutes(regulationGroup, regulationHandler, mw)
 	savingBookHttp.MapAuthRoutes(savingBookGroup, savingBookHandler, mw)
+	websocket.MapAuthRoutes(socketGroup, s.hub, mw)
 
 
 	ctx := context.Background()
