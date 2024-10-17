@@ -33,7 +33,6 @@ func (s *Scheduler) Stop() {
 	s.cron.Stop()
 }
 func (s *Scheduler) handleSavingBook() {
-	log.Println("running")
 	collectionInterface := s.savingBookRepo.GetCollection()
 	collection := collectionInterface.(*mongo.Collection)
 
@@ -108,7 +107,7 @@ func (s *Scheduler) handleSavingBook() {
 		log.Println("Error iterating cursor:", err)
 	}
 
-	log.Println("Daily cron job finished")
+	//log.Println("Daily cron job finished")
 
 }
 func monthsBetween(start, end time.Time) int {

@@ -15,9 +15,12 @@ type savingRegulationUseCase struct {
 }
 
 func (s *savingRegulationUseCase) CreateRegulation(ctx context.Context, input *presenter.SavingRegulationInput, creatorId string) (*domain.SavingRegulation, error) {
-
+	err := input.Validate()
+	if err != nil {
+		return nil, err
+	}
 	regulation := &domain.SavingRegulation{}
-	err := copier.Copy(regulation, input)
+	err = copier.Copy(regulation, input)
 	if err != nil {
 		return nil, err
 	}
