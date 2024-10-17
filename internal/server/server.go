@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"SavingBooks/config"
+	"SavingBooks/internal/services/cron"
 	"SavingBooks/internal/services/kafka"
 	"SavingBooks/internal/services/websocket"
 	"github.com/gin-gonic/gin"
@@ -26,6 +27,7 @@ type Server struct {
 	logger *logrus.Logger
 	ready chan bool
 	hub *websocket.Hub
+	scheduler *cron.Scheduler
 }
 
 func NewServer( cfg *config.Configuration, db *mongo.Client, logger *logrus.Logger, ready chan bool) *Server {
@@ -49,10 +51,13 @@ func (s *Server) Run() error {
 		},
 	}
 	s.hub = websocket.NewHub()
-	savingBookUC, err := s.MapHandlers(s.gin);
+	savingBookUC,savingBookRepo, err := s.MapHandlers(s.gin);
 	if err != nil {
 		return  err
 	}
+	s.scheduler = cron.NewScheduler(savingBookRepo)
+
+
 
 	if s.ready != nil {
 		s.ready <- true
@@ -72,6 +77,9 @@ func (s *Server) Run() error {
 	if err := kafkaConsumer.StartListening(); err != nil {
 		return err
 	}
+	s.scheduler.Start()
+	defer s.scheduler.Stop()
+
 	s.hub.Run()
 
 

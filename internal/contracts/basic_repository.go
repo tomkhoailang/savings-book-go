@@ -67,7 +67,7 @@ func (r *BaseRepository[T]) Create(ctx context.Context, entity *T) error {
 	_, err := collection.InsertOne(ctx, entity)
 	return err
 }
-func (r *BaseRepository[T]) GetCollection() *mongo.Collection {
+func (r *BaseRepository[T]) GetCollection() interface{} {
 	collection := r.db.Collection(r.collectionName)
 	return collection
 }

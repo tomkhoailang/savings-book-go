@@ -38,10 +38,8 @@ import (
 	notificationUC "SavingBooks/internal/notification/usecase"
 )
 
-func (s *Server) MapHandlers(g *gin.Engine) (saving_book.UseCase, error) {
+func (s *Server) MapHandlers(g *gin.Engine) (saving_book.UseCase, saving_book.SavingBookRepository, error) {
 	db := s.db.Database(s.cfg.DatabaseName)
-	//s.hub = websocket.NewHub()
-	//s.hub.Run()
 
 
 	userRepo := authRepo.NewUserRepository(db,"Users")
@@ -61,7 +59,7 @@ func (s *Server) MapHandlers(g *gin.Engine) (saving_book.UseCase, error) {
 	roleUc := roleUC.NewRoleUseCase(roleRepo)
 	paymentUC := paymentUC.NewPaymentUseCase(s.cfg.ClientId, s.cfg.ClientSecret)
 	regulationUC := regulationUC.NewSavingRegulationUseCase(regulationRepo)
-	notificationUC := notificationUC.NewNotificationUseCase(notificationRepo)
+	notificationUC := notificationUC.NewNotificationUseCase(notificationRepo, s.hub)
 	savingBookUC := savingBookUC.NewSavingBookUseCase(regulationRepo,savingBookRepo,ticketRepo, paymentUC,notificationUC, kafkaProducer)
 
 	testHandler := testHttp.NewTestServiceHandler(testUC)
@@ -99,9 +97,9 @@ func (s *Server) MapHandlers(g *gin.Engine) (saving_book.UseCase, error) {
 	ctx := context.Background()
 	if err := roleRepo.SeedRole(ctx); err != nil {
 		fmt.Println("Something wrong with seed roles")
-		return savingBookUC, err
+		return savingBookUC,savingBookRepo, err
 	}
 
 
-	return savingBookUC, nil
+	return savingBookUC,savingBookRepo, nil
 }

@@ -3,8 +3,8 @@
 var (
 	WaitingForInit = "waiting for init payment"
 	WaitingForDeposit = "waiting for deposit payment"
-	Active = "active"
-	Expired = "expired"
+	SavingBookActive = "active"
+	SavingBookExpired = "expired"
 )
 
 var (

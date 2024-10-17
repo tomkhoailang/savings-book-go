@@ -8,7 +8,7 @@ type SavingRegulation struct {
 	IsActive         bool         `bson:"IsActive" json:"isActive"`
 }
 type SavingType struct {
-	Name         string  `json:"name"`
-	Term         int     `json:"term"`
-	InterestRate float64 `json:"interestRate"`
+	Name         string  `bson:"Name" json:"name"`
+	Term         int     `bson:"Term" json:"term"`
+	InterestRate float64 `bson:"InterestRate" json:"interestRate"`
 }

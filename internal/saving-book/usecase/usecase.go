@@ -206,7 +206,11 @@ func (s *savingBookUseCase) ConfirmPaymentOnline(ctx context.Context, paymentId 
 		savingBook.NewPaymentType = ""
 		savingBook.Status = ""
 
-		_, err = s.savingBookRepo.Update(ctx, savingBook, savingBook.Id.Hex(), []string{"Balance", "Status", "NewPaymentLink", "NewPaymentType", "NewPaymentId", "NewPaymentAmount"})
+		nextMonth  := time.Now().AddDate(0, 1, 1)
+		savingBook.NextScheduleMonth = time.Date(nextMonth.Year(), nextMonth.Month(), nextMonth.Day(), 0, 0, 0, 0, time.Local)
+
+
+		_, err = s.savingBookRepo.Update(ctx, savingBook, savingBook.Id.Hex(), []string{"NextScheduleMonth", "Balance", "Status", "NewPaymentLink", "NewPaymentType", "NewPaymentId", "NewPaymentAmount"})
 
 		if err != nil {
 			_ = session.AbortTransaction(ctx)

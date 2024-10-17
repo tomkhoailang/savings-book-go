@@ -14,4 +14,5 @@ type GenericRepository[T any] interface {
 	DeleteMany(ctx context.Context, deleterId string, ids []string) error
 	GetList(ctx context.Context, query interface{}) (interface{}, error)
 	CountAll(ctx context.Context) (int, error)
+	GetCollection() interface{}
 }
