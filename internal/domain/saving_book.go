@@ -20,6 +20,7 @@ type SavingBook struct {
 	NewPaymentType   string  `bson:"NewPaymentType" json:"newPaymentType"`
 	NewPaymentId     string  `bson:"NewPaymentId" json:"newPaymentId"`
 	NewPaymentAmount float64 `bson:"NewPaymentAmount" json:"newPaymentAmount"`
+	NewPaymentStatus string `bson:"NewPaymentStatus" json:"newPaymentStatus"`
 }
 
 type Regulation struct {

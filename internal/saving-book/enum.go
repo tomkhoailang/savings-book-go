@@ -1,10 +1,12 @@
 ﻿package saving_book
 
 var (
-	WaitingForInit = "waiting for init payment"
 	WaitingForDeposit = "waiting for deposit payment"
+	WaitingForInit = "waiting for init payment"
 	SavingBookActive = "active"
 	SavingBookExpired = "expired"
+	SavingBookInit = "init"
+
 )
 
 var (

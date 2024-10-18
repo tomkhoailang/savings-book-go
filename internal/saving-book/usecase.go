@@ -10,7 +10,6 @@ import (
 )
 
 type UseCase interface {
-	CreateSavingBook(ctx context.Context)
 	CreateSavingBookOnline(ctx context.Context, input *presenter.SavingBookGuestInput, creatorId string)(*domain.SavingBook, error)
 	ConfirmPaymentOnline(ctx context.Context, paymentId string) error
 	WithdrawOnline(ctx context.Context, input *presenter.WithDrawInput, savingBookId string) error

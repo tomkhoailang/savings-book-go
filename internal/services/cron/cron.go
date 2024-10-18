@@ -36,9 +36,8 @@ func (s *Scheduler) handleSavingBook() {
 	collectionInterface := s.savingBookRepo.GetCollection()
 	collection := collectionInterface.(*mongo.Collection)
 
-
 	now := time.Now()
-	filterDate := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	filterDate := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
 
 	filter := bson.M{"NextScheduleMonth": filterDate}
 
@@ -73,7 +72,7 @@ func (s *Scheduler) handleSavingBook() {
 			interestRate = newestRegulation.NoTermInterestRate
 
 		}
-		newBalance := savingBook.Balance + (savingBook.Balance * interestRate)
+		newBalance := savingBook.Balance + (savingBook.Balance * (interestRate/100))
 
 
 		updateDoc := bson.M{"Balance": newBalance,
@@ -106,8 +105,6 @@ func (s *Scheduler) handleSavingBook() {
 	if err = cursor.Err(); err != nil {
 		log.Println("Error iterating cursor:", err)
 	}
-
-	//log.Println("Daily cron job finished")
 
 }
 func monthsBetween(start, end time.Time) int {

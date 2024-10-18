@@ -46,8 +46,6 @@ func (s *savingBookUseCase) WithdrawOnline(ctx context.Context, input *presenter
 	}
 	savingBook.Balance -= input.Amount
 
-
-
 	ticket := &domain.TransactionTicket{
 		SavingBookId:      savingBook.Id,
 		TransactionDate:   time.Now(),
@@ -163,11 +161,11 @@ func (s *savingBookUseCase) ConfirmPaymentOnline(ctx context.Context, paymentId 
 		return err
 	}
 	var transactType string
-	if savingBook.NewPaymentType == "" {
+	if savingBook.NewPaymentStatus == "" {
 		return errors.New(saving_book.NoCurrentTransaction)
 	}
 
-	switch savingBook.NewPaymentType {
+	switch savingBook.NewPaymentStatus {
 	case saving_book.WaitingForInit:
 		transactType = saving_book.TransactionTypeInit
 	case saving_book.WaitingForDeposit:
@@ -204,13 +202,14 @@ func (s *savingBookUseCase) ConfirmPaymentOnline(ctx context.Context, paymentId 
 		savingBook.NewPaymentLink = ""
 		savingBook.NewPaymentId = ""
 		savingBook.NewPaymentType = ""
-		savingBook.Status = ""
+		savingBook.NewPaymentStatus = ""
+		savingBook.Status = saving_book.SavingBookActive
 
 		nextMonth  := time.Now().AddDate(0, 1, 1)
 		savingBook.NextScheduleMonth = time.Date(nextMonth.Year(), nextMonth.Month(), nextMonth.Day(), 0, 0, 0, 0, time.Local)
 
 
-		_, err = s.savingBookRepo.Update(ctx, savingBook, savingBook.Id.Hex(), []string{"NextScheduleMonth", "Balance", "Status", "NewPaymentLink", "NewPaymentType", "NewPaymentId", "NewPaymentAmount"})
+		_, err = s.savingBookRepo.Update(ctx, savingBook, savingBook.Id.Hex(), []string{"NextScheduleMonth", "Balance", "Status", "NewPaymentLink", "NewPaymentType", "NewPaymentId", "NewPaymentAmount", "NewPaymentStatus"})
 
 		if err != nil {
 			_ = session.AbortTransaction(ctx)
@@ -254,8 +253,9 @@ func (s *savingBookUseCase) CreateSavingBookOnline(ctx context.Context, input *p
 	}
 
 	entity.Regulations = append(entity.Regulations, *req)
-	entity.Status = saving_book.WaitingForInit
-	entity.NewPaymentType = saving_book.MethodOnline
+	entity.Status = saving_book.SavingBookInit
+	entity.NewPaymentType = saving_book.TransactionTypeDeposit
+	entity.NewPaymentStatus = saving_book.WaitingForInit
 	entity.SetCreate(creatorId)
 
 	objectId, err := primitive.ObjectIDFromHex(creatorId)
@@ -271,6 +271,7 @@ func (s *savingBookUseCase) CreateSavingBookOnline(ctx context.Context, input *p
 	if err != nil {
 		return nil, err
 	}
+
 	entity.NewPaymentLink = resp.Links[1].Href
 	entity.NewPaymentId = resp.Id
 	err = s.savingBookRepo.Create(ctx, entity)
@@ -279,11 +280,6 @@ func (s *savingBookUseCase) CreateSavingBookOnline(ctx context.Context, input *p
 	}
 
 	return entity, nil
-}
-
-func (s *savingBookUseCase) CreateSavingBook(ctx context.Context) {
-	//TODO implement me
-	panic("implement me")
 }
 
 func (s *savingBookUseCase) GetListSavingRegulation(ctx context.Context, query *contracts.Query) (*contracts.QueryResult[domain.SavingBook], error) {
