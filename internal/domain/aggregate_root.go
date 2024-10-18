@@ -44,6 +44,10 @@ func (a *AggregateRoot) SetUpdate(lastModifierId string) {
 	a.LastModificationTime = time.Now()
 	a.ConcurrencyStamp = uuid.New().String()
 }
+func (a *AggregateRoot) SetSysUpdate() {
+	a.LastModificationTime = time.Now()
+	a.ConcurrencyStamp = uuid.New().String()
+}
 
 func (a *AggregateRoot) SetDelete(deleterId primitive.ObjectID) {
 	a.IsDeleted = true

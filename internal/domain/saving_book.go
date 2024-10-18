@@ -16,11 +16,6 @@ type SavingBook struct {
 	Status            string             `bson:"Status" json:"status"`
 	NextScheduleMonth time.Time          `bson:"NextScheduleMonth" json:"nextScheduleMonth"`
 
-	NewPaymentLink   string  `bson:"NewPaymentLink" json:"newPaymentLink"`
-	NewPaymentType   string  `bson:"NewPaymentType" json:"newPaymentType"`
-	NewPaymentId     string  `bson:"NewPaymentId" json:"newPaymentId"`
-	NewPaymentAmount float64 `bson:"NewPaymentAmount" json:"newPaymentAmount"`
-	NewPaymentStatus string `bson:"NewPaymentStatus" json:"newPaymentStatus"`
 }
 
 type Regulation struct {

@@ -7,7 +7,6 @@ import (
 
 type Notification struct {
 	AggregateRoot     `bson:",inline" json:",inline"`
-	SavingBookId      primitive.ObjectID `bson:"SavingBookId" json:"savingBookId"`
 	UserId            primitive.ObjectID `bson:"UserId" json:"userId"`
 	Message           string             `bson:"Message" json:"message"`
 	IsRead            bool               `bson:"IsRead" json:"isRead"`

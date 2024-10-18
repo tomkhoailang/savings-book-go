@@ -40,7 +40,7 @@ func (p *KafkaProducer) SendMessage(topic string, value []byte) error {
 	defer cancel()
 
 	for attempt := 0; attempt < maxRetries; attempt++ {
-		err := writer.WriteMessages(ctx,
+		err = writer.WriteMessages(ctx,
 			kafka.Message{
 				Value: value,
 			},

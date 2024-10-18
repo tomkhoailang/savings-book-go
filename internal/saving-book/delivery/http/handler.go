@@ -67,7 +67,7 @@ func (s *savingBookHandler) ConfirmPayment() gin.HandlerFunc {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
-		c.JSON(http.StatusCreated, "Payment confirmed successfully")
+		c.JSON(http.StatusOK, "ok")
 		return
 	}
 }

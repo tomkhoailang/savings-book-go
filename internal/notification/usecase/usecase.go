@@ -7,7 +7,6 @@ import (
 	"SavingBooks/internal/notification"
 	"SavingBooks/internal/notification/presenter"
 	"SavingBooks/internal/services/websocket"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type notificationUseCase struct {
@@ -17,7 +16,6 @@ type notificationUseCase struct {
 
 func (n *notificationUseCase) SendNotification(ctx context.Context, input *presenter.NotificationInput) error {
 	notification := &domain.Notification{
-		SavingBookId:        primitive.ObjectID{},
 		UserId:              input.UserId,
 		Message:             input.Message,
 		IsRead:              false,

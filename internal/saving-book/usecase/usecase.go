@@ -47,15 +47,14 @@ func (s *savingBookUseCase) WithdrawOnline(ctx context.Context, input *presenter
 	savingBook.Balance -= input.Amount
 
 	ticket := &domain.TransactionTicket{
-		SavingBookId:      savingBook.Id,
-		TransactionDate:   time.Now(),
-		TransactionType:   saving_book.TransactionTypeWithdraw,
-		TransactionMethod: saving_book.MethodOnline,
-		Status:            transaction_ticket.TransactionStatusPending,
-		Amount:            input.Amount,
-		Email:             input.Email,
+		SavingBookId:    savingBook.Id,
+		TransactionDate: time.Now(),
+		Status:          transaction_ticket.TransactionStatusPending,
+		Email:           input.Email,
+		PaymentType:     saving_book.TransactionTypeWithdraw,
+		PaymentAmount:   input.Amount,
 	}
-	ticket.SetCreate(savingBook.CreatorId.Hex())
+	ticket.SetInit()
 
 	session, err := s.ticketRepo.GetMongoClient().StartSession()
 	if err != nil {
@@ -97,6 +96,7 @@ func (s *savingBookUseCase) WithdrawOnline(ctx context.Context, input *presenter
 	}
 	return nil
 }
+
 func (s *savingBookUseCase) HandleWithdraw(ctx context.Context, input *event.WithDrawEvent) error {
 	ticket, err := s.ticketRepo.Get(ctx, input.TransactionId)
 	if err != nil {
@@ -156,23 +156,21 @@ func (s *savingBookUseCase) HandleWithdraw(ctx context.Context, input *event.Wit
 
 func (s *savingBookUseCase) ConfirmPaymentOnline(ctx context.Context, paymentId string) error {
 
-	savingBook, err := s.savingBookRepo.GetByField(ctx, "NewPaymentId", paymentId)
+	ticket, err := s.ticketRepo.GetByField(ctx, "PaymentId", paymentId)
 	if err != nil {
 		return err
 	}
-	var transactType string
-	if savingBook.NewPaymentStatus == "" {
-		return errors.New(saving_book.NoCurrentTransaction)
+
+	savingBook, err := s.savingBookRepo.Get(ctx, ticket.SavingBookId.Hex())
+	if err != nil {
+		return err
 	}
 
-	switch savingBook.NewPaymentStatus {
-	case saving_book.WaitingForInit:
-		transactType = saving_book.TransactionTypeInit
-	case saving_book.WaitingForDeposit:
-		transactType = saving_book.TransactionTypeDeposit
+	if ticket.Status != transaction_ticket.TransactionStatusPending {
+		return errors.New(saving_book.TransactionTicketNotPendingStatus)
 	}
 
-	_, err = s.paymentUC.CaptureOrder(ctx, paymentId)
+	resp, err := s.paymentUC.CaptureOrder(ctx, paymentId)
 	if err != nil {
 		return err
 	}
@@ -186,43 +184,37 @@ func (s *savingBookUseCase) ConfirmPaymentOnline(ctx context.Context, paymentId 
 		if err = session.StartTransaction(); err != nil {
 			return err
 		}
-		ticket := &domain.TransactionTicket{
-			SavingBookId:      savingBook.Id,
-			TransactionDate:   time.Now(),
-			TransactionType:   transactType,
-			TransactionMethod: saving_book.MethodOnline,
-			Status:            transaction_ticket.TransactionStatusSuccess,
-			PaymentId:         savingBook.NewPaymentId,
-			Amount:            savingBook.NewPaymentAmount,
-		}
-		ticket.SetInit()
+		ticket.Status = transaction_ticket.TransactionStatusSuccess
+		ticket.PaymentLink = ""
+		ticket.Email = resp.Payer.EmailAddress
+		ticket.TransactionDate = time.Now()
+		ticket.SetSysUpdate()
 
-		savingBook.Balance += savingBook.NewPaymentAmount
-		savingBook.NewPaymentAmount = 0
-		savingBook.NewPaymentLink = ""
-		savingBook.NewPaymentId = ""
-		savingBook.NewPaymentType = ""
-		savingBook.NewPaymentStatus = ""
-		savingBook.Status = saving_book.SavingBookActive
 
 		nextMonth  := time.Now().AddDate(0, 1, 1)
+		savingBook.Balance += ticket.PaymentAmount
+		updateFields := []string{"Balance", "NextScheduleMonth"}
+
+		if savingBook.Status != saving_book.SavingBookActive {
+			updateFields = append(updateFields, "Status")
+			savingBook.Status = saving_book.SavingBookActive
+		}
+
 		savingBook.NextScheduleMonth = time.Date(nextMonth.Year(), nextMonth.Month(), nextMonth.Day(), 0, 0, 0, 0, time.Local)
 
-
-		_, err = s.savingBookRepo.Update(ctx, savingBook, savingBook.Id.Hex(), []string{"NextScheduleMonth", "Balance", "Status", "NewPaymentLink", "NewPaymentType", "NewPaymentId", "NewPaymentAmount", "NewPaymentStatus"})
+		_, err = s.savingBookRepo.Update(ctx, savingBook, savingBook.Id.Hex(), updateFields)
 
 		if err != nil {
 			_ = session.AbortTransaction(ctx)
 			return err
 		}
-		err = s.ticketRepo.Create(ctx, ticket)
+		_, err = s.ticketRepo.Update(ctx, ticket, ticket.Id.Hex(),[]string{"Status", "PaymentLink", "TransactionDate", "Email"})
 		if err != nil {
 			_ = session.AbortTransaction(ctx)
 			return err
 		}
 		return session.CommitTransaction(ctx)
 	})
-
 	return nil
 }
 
@@ -241,6 +233,10 @@ func (s *savingBookUseCase) CreateSavingBookOnline(ctx context.Context, input *p
 	if err != nil {
 		return nil, err
 	}
+	noTermReq, err := findSavingType(0, regulation)
+	if err != nil {
+		return nil, err
+	}
 
 	req := &domain.Regulation{
 		RegulationIdRef:  regulation.Id,
@@ -250,12 +246,12 @@ func (s *savingBookUseCase) CreateSavingBookOnline(ctx context.Context, input *p
 		InterestRate:     selectedReq.InterestRate,
 		MinWithDrawValue: regulation.MinWithdrawValue,
 		MinWithDrawDay:   regulation.MinWithdrawDay,
+		NoTermInterestRate: noTermReq.InterestRate,
 	}
 
 	entity.Regulations = append(entity.Regulations, *req)
 	entity.Status = saving_book.SavingBookInit
-	entity.NewPaymentType = saving_book.TransactionTypeDeposit
-	entity.NewPaymentStatus = saving_book.WaitingForInit
+
 	entity.SetCreate(creatorId)
 
 	objectId, err := primitive.ObjectIDFromHex(creatorId)
@@ -266,15 +262,44 @@ func (s *savingBookUseCase) CreateSavingBookOnline(ctx context.Context, input *p
 
 	resp, err := s.paymentUC.CreateOrder(ctx, &paypal.InitOrderRequest{
 		SavingBookId: entity.Id.Hex(),
-		Amount:       fmt.Sprintf("%.2f", entity.NewPaymentAmount),
+		Amount:       fmt.Sprintf("%.2f", input.NewPaymentAmount),
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	entity.NewPaymentLink = resp.Links[1].Href
-	entity.NewPaymentId = resp.Id
-	err = s.savingBookRepo.Create(ctx, entity)
+	session, err := s.ticketRepo.GetMongoClient().StartSession()
+	if err != nil {
+		return nil, err
+	}
+	defer session.EndSession(ctx)
+	err = mongo.WithSession(ctx, session, func(sessionContext mongo.SessionContext) error {
+		if err = session.StartTransaction(); err != nil {
+			return err
+		}
+		err = s.savingBookRepo.Create(ctx, entity)
+		if err != nil {
+			_ = session.AbortTransaction(sessionContext)
+			return err
+		}
+		ticket := &domain.TransactionTicket{
+			SavingBookId:    entity.Id,
+			TransactionDate: time.Time{},
+			Status:          transaction_ticket.TransactionStatusPending,
+			Email:           "",
+			PaymentLink:     resp.Links[1].Href,
+			PaymentType:     saving_book.TransactionTypeDeposit,
+			PaymentId:       resp.Id,
+			PaymentAmount:   input.NewPaymentAmount,
+		}
+		err = s.ticketRepo.Create(sessionContext, ticket)
+		if err != nil {
+			_ = session.AbortTransaction(sessionContext)
+			return err
+		}
+		return session.CommitTransaction(sessionContext)
+	})
+
 	if err != nil {
 		return nil, err
 	}

@@ -11,10 +11,5 @@ type SavingBookOutput struct {
 	Address             contracts.Address  ` json:"address"`
 	IdCardNumber        string             ` json:"idCardNumber"`
 	Regulations         []Regulation       ` json:"regulations"`
-	Balance             float64            ` json:"balance"`
 	Status              string             ` json:"status"`
-	NewPaymentLink         string             `json:"newPaymentLink"`
-	NewPaymentType         string             `json:"newPaymentType"`
-	NewPaymentId     string             `json:"newPaymentId"`
-	NewPaymentAmount float64            ` json:"newPaymentAmount"`
 }

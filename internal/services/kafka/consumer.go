@@ -77,20 +77,20 @@ func (kc *KafkaConsumer) listenToTopic(topic string) {
 			log.Printf("Error reading message from topic %s: %v\n", topic, err)
 			continue
 		}
-			switch topic {
-			case CaptureOrderTopic:
-				var withDrawEvent event.WithDrawEvent
-				err = json.Unmarshal(msg.Value, &withDrawEvent)
-				if err != nil {
-					log.Printf("Error unmarshaling message from topic %s: %v\n", topic, err)
-					continue
-				}
-				err = kc.SavingBookUC.HandleWithdraw(context.Background(), &withDrawEvent)
-				if err != nil {
-					log.Printf("Error handling withdraw: %v\n", err)
-				}
-
+		switch topic {
+		case CaptureOrderTopic:
+			var withDrawEvent event.WithDrawEvent
+			err = json.Unmarshal(msg.Value, &withDrawEvent)
+			if err != nil {
+				log.Printf("Error unmarshaling message from topic %s: %v\n", topic, err)
+				continue
 			}
+			err = kc.SavingBookUC.HandleWithdraw(context.Background(), &withDrawEvent)
+			if err != nil {
+				log.Printf("Error handling withdraw: %v\n", err)
+			}
+
+		}
 
 		log.Printf("Message from topic %s: %s = %s\n", msg.Topic, string(msg.Key), string(msg.Value))
 	}

@@ -7,6 +7,11 @@ var (
 	SavingBookExpired = "expired"
 	SavingBookInit = "init"
 
+	TransactionStatusConfirmed = "confirmed"
+	TransactionStatusFailed = "failed"
+	TransactionStatusWaiting = "waiting"
+
+
 )
 
 var (
