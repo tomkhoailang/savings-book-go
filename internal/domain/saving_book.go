@@ -16,6 +16,7 @@ type SavingBook struct {
 	Status            string             `bson:"Status" json:"status"`
 	NextScheduleMonth time.Time          `bson:"NextScheduleMonth" json:"nextScheduleMonth"`
 
+
 }
 
 type Regulation struct {
@@ -28,3 +29,4 @@ type Regulation struct {
 	MinWithDrawDay   int                `bson:"MinWithDrawDay" json:"minWithDrawDay"`
 	NoTermInterestRate float64 `bson:"NoTermInterestRate" json:"noTermInterestRate"`
 }
+

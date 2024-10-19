@@ -35,6 +35,92 @@ type savingBookUseCase struct {
 	kafkaProducer  *kafka2.KafkaProducer
 }
 
+func (s *savingBookUseCase) DepositOnline(ctx context.Context, input *presenter.DepositInput, savingBookId, userId string) (*domain.TransactionTicket, error) {
+	savingBook, err := s.savingBookRepo.Get(ctx, savingBookId)
+	if err != nil {
+		return nil, err
+	}
+	if savingBook.CreatorId.Hex() != userId {
+		return nil, errors.New(saving_book.NotSavingBookOwnerError)
+	}
+	//if savingBook.Status != saving_book.SavingBookExpired {
+	//	return nil, errors.New(saving_book.CannotDepositError)
+	//}
+
+	latestReg, err := s.regulationRepo.GetLatestSavingRegulation(ctx)
+	selectedReq, err := findSavingType(input.Term, latestReg)
+
+	noTermReq, err := findSavingType(0, latestReg)
+	if err != nil {
+		return nil, err
+	}
+
+	reg := &domain.Regulation{
+		RegulationIdRef:  latestReg.Id,
+		ApplyDate: time.Time{},
+		Name:             selectedReq.Name,
+		TermInMonth:      selectedReq.Term,
+		InterestRate:     selectedReq.InterestRate,
+		MinWithDrawValue: latestReg.MinWithdrawValue,
+		MinWithDrawDay:   latestReg.MinWithdrawDay,
+		NoTermInterestRate: noTermReq.InterestRate,
+	}
+
+
+	savingBook.Regulations = append(savingBook.Regulations, *reg)
+	savingBook.Status = saving_book.SavingBookInit
+	savingBook.SetSysUpdate()
+
+	resp, err := s.paymentUC.CreateOrder(ctx, &paypal.InitOrderRequest{
+		SavingBookId: savingBookId,
+		Amount:       fmt.Sprintf("%.2f", input.Amount),
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	ticket := &domain.TransactionTicket{
+		SavingBookId:    savingBook.Id,
+		TransactionDate: time.Time{},
+		Status:          transaction_ticket.TransactionStatusPending,
+		Email:           "",
+		PaymentLink:     resp.Links[1].Href,
+		PaymentType:     saving_book.TransactionTypeDeposit,
+		PaymentId:       resp.Id,
+		PaymentAmount:   input.Amount,
+	}
+	ticket.SetCreate(userId)
+
+	session, err := s.ticketRepo.GetMongoClient().StartSession()
+	if err != nil {
+		return nil, err
+	}
+	defer session.EndSession(ctx)
+	err = mongo.WithSession(ctx, session, func(sessionContext mongo.SessionContext) error {
+		if err = session.StartTransaction(); err != nil {
+			return err
+		}
+		_, err = s.savingBookRepo.Update(ctx, savingBook, savingBook.Id.Hex(), []string{"Regulations","Status"})
+		if err != nil {
+			_ = session.AbortTransaction(sessionContext)
+			return err
+		}
+		err = s.ticketRepo.Create(sessionContext, ticket)
+		if err != nil {
+			_ = session.AbortTransaction(sessionContext)
+			return err
+		}
+		return session.CommitTransaction(sessionContext)
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return ticket, nil
+}
+
 func (s *savingBookUseCase) WithdrawOnline(ctx context.Context, input *presenter.WithDrawInput, savingBookId, userId string) error {
 	savingBook, err := s.savingBookRepo.Get(ctx, savingBookId)
 	if err != nil {
@@ -119,7 +205,6 @@ func (s *savingBookUseCase) HandleWithdraw(ctx context.Context, input *event.Wit
 	}
 	defer session.EndSession(ctx)
 
-
 	err = mongo.WithSession(ctx, session, func(sessionContext mongo.SessionContext) error {
 		if err = session.StartTransaction(); err != nil {
 			return err
@@ -135,7 +220,7 @@ func (s *savingBookUseCase) HandleWithdraw(ctx context.Context, input *event.Wit
 			_ = session.AbortTransaction(sessionContext)
 			return err
 		}
-		return nil
+		return session.CommitTransaction(sessionContext)
 	})
 	if err != nil {
 		if revertErr := s.revertBalanceAndNotify(ctx, input, ticket); revertErr != nil {
@@ -162,6 +247,9 @@ func (s *savingBookUseCase) ConfirmPaymentOnline(ctx context.Context, paymentId 
 
 	ticket, err := s.ticketRepo.GetByField(ctx, "PaymentId", paymentId)
 	if err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return errors.New(saving_book.TransactionTicketNotFound)
+		}
 		return err
 	}
 	if ticket.CreatorId.Hex() != userId {
@@ -207,6 +295,14 @@ func (s *savingBookUseCase) ConfirmPaymentOnline(ctx context.Context, paymentId 
 			savingBook.Status = saving_book.SavingBookActive
 		}
 
+		if len(savingBook.Regulations) > 0 {
+			lastReg := &savingBook.Regulations[len(savingBook.Regulations)-1]
+
+			if lastReg.ApplyDate.IsZero() {
+				updateFields = append(updateFields, "ApplyDate")
+				lastReg.ApplyDate = time.Now()
+			}
+		}
 		savingBook.NextScheduleMonth = time.Date(nextMonth.Year(), nextMonth.Month(), nextMonth.Day(), 0, 0, 0, 0, time.Local)
 
 		_, err = s.savingBookRepo.Update(ctx, savingBook, savingBook.Id.Hex(), updateFields)
@@ -231,7 +327,7 @@ func (s *savingBookUseCase) CreateSavingBookOnline(ctx context.Context, input *p
 	if err != nil {
 		return nil, err
 	}
-	regulation, err := s.regulationRepo.Get(ctx, input.RegulationId)
+	regulation, err := s.regulationRepo.GetLatestSavingRegulation(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -245,9 +341,9 @@ func (s *savingBookUseCase) CreateSavingBookOnline(ctx context.Context, input *p
 		return nil, err
 	}
 
-	req := &domain.Regulation{
+	reg := &domain.Regulation{
 		RegulationIdRef:  regulation.Id,
-		ApplyDate:        time.Now(),
+		ApplyDate: time.Time{},
 		Name:             selectedReq.Name,
 		TermInMonth:      selectedReq.Term,
 		InterestRate:     selectedReq.InterestRate,
@@ -256,7 +352,7 @@ func (s *savingBookUseCase) CreateSavingBookOnline(ctx context.Context, input *p
 		NoTermInterestRate: noTermReq.InterestRate,
 	}
 
-	entity.Regulations = append(entity.Regulations, *req)
+	entity.Regulations = append(entity.Regulations, *reg)
 	entity.Status = saving_book.SavingBookInit
 
 	entity.SetCreate(creatorId)
@@ -357,6 +453,7 @@ func (s *savingBookUseCase) revertBalanceAndNotify(ctx context.Context, input *e
 
 	return nil
 }
+
 
 func NewSavingBookUseCase(regulationRepo regulation.SavingRegulationRepository, savingBookRepo saving_book.SavingBookRepository, ticketRepo transaction_ticket.TransactionTicketRepository, paymentUC payment.PaymentUseCase, notificationUC notification.UseCase, kafkaProducer *kafka2.KafkaProducer) saving_book.UseCase {
 	return &savingBookUseCase{regulationRepo: regulationRepo, savingBookRepo: savingBookRepo, ticketRepo: ticketRepo, paymentUC: paymentUC, notificationUC: notificationUC, kafkaProducer: kafkaProducer}

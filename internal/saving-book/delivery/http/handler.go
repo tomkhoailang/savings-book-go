@@ -14,6 +14,39 @@ type savingBookHandler struct {
 	savingBookUC saving_book.UseCase
 }
 
+func (s *savingBookHandler) DepositOnline() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var input presenter.DepositInput
+
+		savingBookId := c.Param("id")
+		if savingBookId == "" {
+			c.JSON(http.StatusInternalServerError, gin.H{"err":"id can not be empty"})
+			return
+		}
+
+		err := utils.ReadRequest(c, &input)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		userId, err := utils.GetUserId(c)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		ticket, err := s.savingBookUC.DepositOnline(c, &input, savingBookId, userId)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		c.JSON(http.StatusOK, ticket)
+		return
+
+	}
+}
+
 func (s *savingBookHandler) WithDrawOnline() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var input presenter.WithDrawInput

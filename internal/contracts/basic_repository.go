@@ -54,8 +54,8 @@ func (r *BaseRepository[T]) GetByField(ctx context.Context, field string, value 
 	default:
 		return nil, fmt.Errorf("unsupported value type: %T", v)
 	}
-
-	err := collection.FindOne(ctx, bson.M{field: queryValue}).Decode(&entity)
+	opts := options.FindOne().SetSort(bson.D{{"CreationTime", -1}})
+	err := collection.FindOne(ctx, bson.M{field: queryValue}, opts).Decode(&entity)
 	if err != nil {
 		return nil, err
 	}

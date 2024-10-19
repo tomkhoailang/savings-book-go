@@ -7,5 +7,6 @@ type Handler interface {
 	CreateSavingBookOnline() gin.HandlerFunc
 	ConfirmPayment() gin.HandlerFunc
 	WithDrawOnline() gin.HandlerFunc
+	DepositOnline() gin.HandlerFunc
 
 }

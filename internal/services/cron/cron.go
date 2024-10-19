@@ -39,7 +39,10 @@ func (s *Scheduler) handleSavingBook() {
 	now := time.Now()
 	filterDate := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
 
-	filter := bson.M{"NextScheduleMonth": filterDate, "Status": saving_book.SavingBookActive}
+	filter := bson.M{
+		"NextScheduleMonth": filterDate,
+		"Balance":           bson.M{"$gt": 0},
+	}
 
 	cursor, err := collection.Find(context.Background(), filter)
 
@@ -57,30 +60,27 @@ func (s *Scheduler) handleSavingBook() {
 			log.Println("Error decoding saving book:", err)
 			continue
 		}
+		if len(savingBook.Regulations) == 0 {
+			log.Println("Cannot find a regulation for this saving book")
+			continue
+		}
 		newestRegulation := savingBook.Regulations[len(savingBook.Regulations)-1]
 
-		monthRange := monthsBetween(savingBook.CreationTime, now)
+		monthRange := monthsBetween(newestRegulation.ApplyDate, now)
 		interestRate := newestRegulation.InterestRate
-
-		statusChanged := false
+		updateDoc := bson.M{
+			"NextScheduleMonth": now.AddDate(0, 1, 0).Truncate(24 * time.Hour),
+		}
 
 		if monthRange >= newestRegulation.TermInMonth {
 			if savingBook.Status != saving_book.SavingBookExpired {
-				savingBook.Status = saving_book.SavingBookExpired
-				statusChanged = true
+				updateDoc["Status"] = saving_book.SavingBookExpired
 			}
 			interestRate = newestRegulation.NoTermInterestRate
 
 		}
-		newBalance := savingBook.Balance + (savingBook.Balance * (interestRate/100))
-
-
-		updateDoc := bson.M{"Balance": newBalance,
-			"NextScheduleMonth": now.AddDate(0, 1, 0).Truncate(24 * time.Hour),
-		}
-		if statusChanged {
-			updateDoc["Status"] = savingBook.Status
-		}
+		newBalance := savingBook.Balance + (savingBook.Balance * (interestRate / 100))
+		updateDoc["Balance"] = newBalance
 
 		update := mongo.NewUpdateOneModel().
 			SetFilter(bson.M{"_id": savingBook.Id}).

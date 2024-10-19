@@ -16,7 +16,6 @@ type SavingBookInput struct {
 type SavingBookGuestInput struct {
 	Address      contracts.Address ` json:"address" validate:"required"`
 	IdCardNumber string            ` json:"idCardNumber" validate:"required,min=12" `
-	RegulationId string            ` json:"regulationId" validate:"required"`
 	Term         int            ` json:"term" validate:"required"`
 	NewPaymentAmount      float64            ` json:"newPaymentAmount" validate:"required,min=10"`
 }
