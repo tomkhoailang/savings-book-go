@@ -12,6 +12,7 @@
 # Environment variable files
 *.env
 self_cert/
+tmp/
 
 # PEM files
 *.pem

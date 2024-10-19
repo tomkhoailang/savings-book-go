@@ -3,24 +3,100 @@
 import (
 	"net/http"
 
+	"SavingBooks/internal/contracts"
 	"SavingBooks/internal/domain"
+	monthly_saving_interest "SavingBooks/internal/monthly-saving-interest"
 	saving_book "SavingBooks/internal/saving-book"
 	"SavingBooks/internal/saving-book/presenter"
+	transaction_ticket "SavingBooks/internal/transaction-ticket"
+	presenter2 "SavingBooks/internal/transaction-ticket/presenter"
 	"SavingBooks/utils"
 	"github.com/gin-gonic/gin"
+	"github.com/jinzhu/copier"
 )
 
 type savingBookHandler struct {
 	savingBookUC saving_book.UseCase
+	ticketUc     transaction_ticket.UseCase
+	monthlyUC    monthly_saving_interest.UseCase
 }
 
+func (s *savingBookHandler) GetListSavingBook() gin.HandlerFunc {
+	return utils.HandleGetListRequestAuth[domain.SavingBook](s.savingBookUC.GetListSavingBook)
+}
+
+func (s *savingBookHandler) GetTicketsOfSavingBook() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var query contracts.Query
+		if err := c.ShouldBindQuery(&query); err != nil {
+			c.JSON(400, gin.H{"error": err.Error()})
+			return
+		}
+		userId, err := utils.GetUserId(c)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		savingBookId := c.Param("id")
+		if savingBookId == "" {
+			c.JSON(http.StatusInternalServerError, gin.H{"err": "id can not be empty"})
+			return
+		}
+
+		var output contracts.QueryResult[presenter2.TransactionTicketOutput]
+		res, err := s.ticketUc.GetListTransactionTicketOfSavingBook(c, &query, userId, savingBookId)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		err = copier.Copy(&output, res)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, output)
+	}
+}
+
+func (s *savingBookHandler) GetMonthlyInterestOfSavingBook() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var query contracts.Query
+		if err := c.ShouldBindQuery(&query); err != nil {
+			c.JSON(400, gin.H{"error": err.Error()})
+			return
+		}
+		userId, err := utils.GetUserId(c)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		savingBookId := c.Param("id")
+		if savingBookId == "" {
+			c.JSON(http.StatusInternalServerError, gin.H{"err": "id can not be empty"})
+			return
+		}
+
+		var output contracts.QueryResult[presenter2.TransactionTicketOutput]
+		res, err := s.monthlyUC.GetListMonthlyInterestOfSavingBook(c, &query, userId, savingBookId)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		err = copier.Copy(&output, res)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, output)
+	}
+}
 func (s *savingBookHandler) DepositOnline() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var input presenter.DepositInput
 
 		savingBookId := c.Param("id")
 		if savingBookId == "" {
-			c.JSON(http.StatusInternalServerError, gin.H{"err":"id can not be empty"})
+			c.JSON(http.StatusInternalServerError, gin.H{"err": "id can not be empty"})
 			return
 		}
 
@@ -53,7 +129,7 @@ func (s *savingBookHandler) WithDrawOnline() gin.HandlerFunc {
 
 		savingBookId := c.Param("id")
 		if savingBookId == "" {
-			c.JSON(http.StatusInternalServerError, gin.H{"err":"id can not be empty"})
+			c.JSON(http.StatusInternalServerError, gin.H{"err": "id can not be empty"})
 			return
 		}
 
@@ -77,10 +153,6 @@ func (s *savingBookHandler) WithDrawOnline() gin.HandlerFunc {
 		return
 
 	}
-}
-
-func (s *savingBookHandler) GetListSavingBook() gin.HandlerFunc {
-	return utils.HandleGetListRequestAuth[domain.SavingBook](s.savingBookUC.GetListSavingBook)
 }
 
 func (s *savingBookHandler) CreateSavingBookOnline() gin.HandlerFunc {
@@ -113,7 +185,6 @@ func (s *savingBookHandler) ConfirmPayment() gin.HandlerFunc {
 	}
 }
 
-
-func NewSavingBookHandler(savingBookUC saving_book.UseCase) saving_book.Handler {
-	return &savingBookHandler{savingBookUC: savingBookUC}
+func NewSavingBookHandler(savingBookUC saving_book.UseCase, ticketUc transaction_ticket.UseCase, monthlyUC monthly_saving_interest.UseCase) saving_book.Handler {
+	return &savingBookHandler{savingBookUC: savingBookUC, ticketUc: ticketUc, monthlyUC: monthlyUC}
 }

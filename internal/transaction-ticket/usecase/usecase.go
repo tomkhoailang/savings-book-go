@@ -6,11 +6,13 @@ import (
 	"SavingBooks/internal/auth/presenter"
 	"SavingBooks/internal/contracts"
 	"SavingBooks/internal/domain"
+	saving_book "SavingBooks/internal/saving-book"
 	transaction_ticket "SavingBooks/internal/transaction-ticket"
 )
 
 type transactionTicketUseCase struct {
 	ticketRepo     transaction_ticket.TransactionTicketRepository
+	savingBookRepo saving_book.SavingBookRepository
 }
 
 
@@ -32,7 +34,19 @@ func (t *transactionTicketUseCase) GetListTransactionTicket(ctx context.Context,
 	return savingBooks, nil
 }
 
+func (t *transactionTicketUseCase) GetListTransactionTicketOfSavingBook(ctx context.Context, query *contracts.Query, userId , savingBookId string) (*contracts.QueryResult[domain.TransactionTicket], error) {
+	var ticketInterfaces interface{}
+	var err error
+	ticketInterfaces, err = t.ticketRepo.GetListAuthOnReference(ctx, query, userId,"SavingBookId", savingBookId)
+	if err != nil {
+		return nil, err
+	}
 
-func NewTransactionTicketUseCase( ticketRepo transaction_ticket.TransactionTicketRepository) transaction_ticket.UseCase {
-	return &transactionTicketUseCase{ ticketRepo: ticketRepo}
+	tickets := ticketInterfaces.(*contracts.QueryResult[domain.TransactionTicket])
+	return tickets, nil
+}
+
+
+func NewTransactionTicketUseCase( ticketRepo transaction_ticket.TransactionTicketRepository, savingBookRepo saving_book.SavingBookRepository) transaction_ticket.UseCase {
+	return &transactionTicketUseCase{ ticketRepo: ticketRepo, savingBookRepo: savingBookRepo}
 }

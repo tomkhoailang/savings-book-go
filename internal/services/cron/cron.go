@@ -2,10 +2,12 @@
 
 import (
 	"context"
+	"errors"
 	"log"
 	"time"
 
 	"SavingBooks/internal/domain"
+	monthly_saving_interest "SavingBooks/internal/monthly-saving-interest"
 	saving_book "SavingBooks/internal/saving-book"
 	"github.com/robfig/cron/v3"
 	"go.mongodb.org/mongo-driver/bson"
@@ -13,12 +15,13 @@ import (
 )
 
 type Scheduler struct {
-	savingBookRepo saving_book.SavingBookRepository
-	cron           *cron.Cron
+	savingBookRepo          saving_book.SavingBookRepository
+	monthSavingInterestRepo monthly_saving_interest.Repository
+	cron                    *cron.Cron
 }
 
-func NewScheduler(sv saving_book.SavingBookRepository) *Scheduler {
-	return &Scheduler{savingBookRepo: sv, cron: cron.New(cron.WithSeconds())}
+func NewScheduler(sv saving_book.SavingBookRepository, monthSavingInterestRepo monthly_saving_interest.Repository) *Scheduler {
+	return &Scheduler{savingBookRepo: sv, monthSavingInterestRepo: monthSavingInterestRepo, cron: cron.New(cron.WithSeconds())}
 }
 func (s *Scheduler) Start() {
 	//_, err := c.AddFunc("@midnight", s.handleSavingBook)
@@ -33,8 +36,8 @@ func (s *Scheduler) Stop() {
 	s.cron.Stop()
 }
 func (s *Scheduler) handleSavingBook() {
-	collectionInterface := s.savingBookRepo.GetCollection()
-	collection := collectionInterface.(*mongo.Collection)
+	savingBookInterface := s.savingBookRepo.GetCollection()
+	savingBookCollection := savingBookInterface.(*mongo.Collection)
 
 	now := time.Now()
 	filterDate := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
@@ -44,15 +47,16 @@ func (s *Scheduler) handleSavingBook() {
 		"Balance":           bson.M{"$gt": 0},
 	}
 
-	cursor, err := collection.Find(context.Background(), filter)
+	cursor, err := savingBookCollection.Find(context.Background(), filter)
 
 	if err != nil {
 		log.Println(err)
 		return
 	}
 	defer cursor.Close(context.Background())
-	var operations []mongo.WriteModel
-	batchSize := 500
+	var savingOperations []mongo.WriteModel
+	var monthlyOperations []mongo.WriteModel
+	batchSize := 50
 
 	for cursor.Next(context.Background()) {
 		var savingBook domain.SavingBook
@@ -79,26 +83,37 @@ func (s *Scheduler) handleSavingBook() {
 			interestRate = newestRegulation.NoTermInterestRate
 
 		}
-		newBalance := savingBook.Balance + (savingBook.Balance * (interestRate / 100))
+		newBalance := savingBook.Balance * (1 + (interestRate / 100))
 		updateDoc["Balance"] = newBalance
 
-		update := mongo.NewUpdateOneModel().
+		savingBookUpdate := mongo.NewUpdateOneModel().
 			SetFilter(bson.M{"_id": savingBook.Id}).
 			SetUpdate(bson.M{"$set": updateDoc})
-		operations = append(operations, update)
+		savingOperations = append(savingOperations, savingBookUpdate)
 
-		if len(operations) == batchSize {
-			_, err = collection.BulkWrite(context.Background(), operations)
+		monthlyInterest := domain.MonthlySavingInterest{
+			SavingBookId: savingBook.Id,
+			Amount:       newBalance - savingBook.Balance,
+			InterestRate: interestRate,
+		}
+		monthlyInterest.SetInit()
+		monthlyUpdate := mongo.NewInsertOneModel().SetDocument(&monthlyInterest)
+		monthlyOperations = append(monthlyOperations, monthlyUpdate)
+
+		if len(savingOperations) == batchSize {
+			err := bulkWrite(s.monthSavingInterestRepo, s.savingBookRepo, savingOperations, monthlyOperations)
 			if err != nil {
-				log.Println("Error in BulkWrite:", err)
+				log.Println("error after maximum retry:", err)
+				return
 			}
-			operations = operations[:0]
+			savingOperations = savingOperations[:0]
 		}
 	}
-	if len(operations) > 0 {
-		_, err = collection.BulkWrite(context.Background(), operations)
+	if len(savingOperations) > 0 {
+		err := bulkWrite(s.monthSavingInterestRepo, s.savingBookRepo, savingOperations, monthlyOperations)
 		if err != nil {
-			log.Println("Error in BulkWrite:", err)
+			log.Println("error after maximum retry:", err)
+			return
 		}
 	}
 
@@ -106,6 +121,63 @@ func (s *Scheduler) handleSavingBook() {
 		log.Println("Error iterating cursor:", err)
 	}
 
+}
+func bulkWrite(monthlyRepo monthly_saving_interest.Repository, savingBookRepo saving_book.SavingBookRepository, writeSavingBook, writeMonthly []mongo.WriteModel) error {
+
+	return retry(5, 10*time.Second, func() error {
+		savingBookInterface := savingBookRepo.GetCollection()
+		savingBookCollection := savingBookInterface.(*mongo.Collection)
+
+		monthlyInterface := monthlyRepo.GetCollection()
+		monthlyCollection := monthlyInterface.(*mongo.Collection)
+
+		session, err := monthlyRepo.GetMongoClient().StartSession()
+		if err != nil {
+			log.Println("error starting mongo session:", err)
+			return errors.New("error starting mongo session")
+		}
+
+		defer session.EndSession(context.Background())
+		err = mongo.WithSession(context.Background(), session, func(sessionContext mongo.SessionContext) error {
+			if err = session.StartTransaction(); err != nil {
+				return err
+			}
+			_, err = savingBookCollection.BulkWrite(sessionContext, writeSavingBook)
+			if err != nil {
+				log.Println("Error in BulkWrite:", err)
+			}
+			if err != nil {
+				_ = session.AbortTransaction(sessionContext)
+				return err
+			}
+			_, err = monthlyCollection.BulkWrite(sessionContext, writeMonthly)
+			if err != nil {
+				log.Println("Error in BulkWrite:", err)
+			}
+			if err != nil {
+				_ = session.AbortTransaction(sessionContext)
+				return err
+			}
+			return session.CommitTransaction(sessionContext)
+		})
+		if err != nil {
+			log.Println("bulk write from cron failed", err)
+			return errors.New("bulk write from cron failed")
+		}
+		return nil
+	})
+
+}
+func retry(attempts int, sleep time.Duration, fn func() error) error {
+	var err error
+	for i := 0; i < attempts; i++ {
+		err = fn()
+		if err == nil {
+			return nil
+		}
+		time.Sleep(sleep * time.Duration(i+1))
+	}
+	return err
 }
 func monthsBetween(start, end time.Time) int {
 	yearDiff := end.Year() - start.Year()

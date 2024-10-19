@@ -51,11 +51,11 @@ func (s *Server) Run() error {
 		},
 	}
 	s.hub = websocket.NewHub()
-	savingBookUC,savingBookRepo, err := s.MapHandlers(s.gin);
+	savingBookUC,savingBookRepo,monthlyRepo, err := s.MapHandlers(s.gin);
 	if err != nil {
 		return  err
 	}
-	s.scheduler = cron.NewScheduler(savingBookRepo)
+	s.scheduler = cron.NewScheduler(savingBookRepo, monthlyRepo)
 
 
 

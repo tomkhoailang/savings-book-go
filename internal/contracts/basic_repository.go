@@ -220,6 +220,49 @@ func (r *BaseRepository[T]) GetListAuth(ctx context.Context, query interface{}, 
 
 	return queryResult, nil
 }
+func (r *BaseRepository[T]) GetListAuthOnReference(ctx context.Context, query interface{}, currentUserId, referenceField, referenceKey string) (interface{}, error) {
+	collection := r.db.Collection(r.collectionName)
+
+	filter, options := query.(*Query).QueryBuilder()
+
+	userId, err := primitive.ObjectIDFromHex(currentUserId)
+	if err != nil {
+		return nil, errors.New("invalid ObjectID: " + currentUserId)
+	}
+
+	filter["CreatorId"] = userId
+
+	referenceId, err := primitive.ObjectIDFromHex(referenceKey)
+	if err != nil {
+		return nil, errors.New("invalid ObjectID: " + referenceKey)
+	}
+
+	filter[referenceField] = referenceId
+
+	options.SetSort(bson.D{{"CreationTime", -1}})
+
+	totalCount, err := collection.CountDocuments(ctx, filter)
+	if err != nil {
+		return nil, err
+	}
+
+	cursor, err := collection.Find(ctx, filter, options)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var entities []T
+	if err := cursor.All(ctx, &entities); err != nil {
+		return nil, err
+	}
+	queryResult := &QueryResult[T]{
+		TotalCount: int(totalCount),
+		Items:      entities,
+	}
+
+	return queryResult, nil
+}
 func (r *BaseRepository[T]) GetMany(ctx context.Context, ids []string) (*[]T, error) {
 	collection := r.db.Collection(r.collectionName)
 

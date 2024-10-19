@@ -13,5 +13,7 @@ func MapAuthRoutes(authGroup *gin.RouterGroup,s saving_book.Handler, mw *middlew
 	authGroup.POST("/confirm-payment",s.ConfirmPayment())
 	authGroup.POST("/:id/withdraw-online",s.WithDrawOnline())
 	authGroup.POST("/:id/deposit-online",s.DepositOnline())
+	authGroup.GET("/:id/transaction-ticket",s.GetTicketsOfSavingBook())
+	authGroup.GET("/:id/monthly-interest",s.GetMonthlyInterestOfSavingBook())
 
 }

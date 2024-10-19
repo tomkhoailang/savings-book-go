@@ -7,7 +7,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-type TransactionTicket struct {
+type TransactionTicketOutput struct {
 	contracts.AuditedEntity
 	SavingBookId    primitive.ObjectID ` json:"savingBookId"`
 	TransactionDate time.Time          ` json:"transactionDate"`

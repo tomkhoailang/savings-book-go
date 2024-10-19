@@ -16,6 +16,7 @@ func (t *transactionTicketRepository) GetMongoClient() *mongo.Client {
 	return  t.client
 }
 
+
 func NewTransactionTicketRepository(client *mongo.Client, db *mongo.Database, collectionName string) transaction_ticket.TransactionTicketRepository {
 	baseRepo := contracts.NewBaseRepository[domain.TransactionTicket](db, collectionName)
 	return &transactionTicketRepository{

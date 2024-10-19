@@ -43,9 +43,9 @@ func (s *savingBookUseCase) DepositOnline(ctx context.Context, input *presenter.
 	if savingBook.CreatorId.Hex() != userId {
 		return nil, errors.New(saving_book.NotSavingBookOwnerError)
 	}
-	//if savingBook.Status != saving_book.SavingBookExpired {
-	//	return nil, errors.New(saving_book.CannotDepositError)
-	//}
+	if savingBook.Status != saving_book.SavingBookExpired {
+		return nil, errors.New(saving_book.CannotDepositError)
+	}
 
 	latestReg, err := s.regulationRepo.GetLatestSavingRegulation(ctx)
 	selectedReq, err := findSavingType(input.Term, latestReg)
@@ -56,16 +56,15 @@ func (s *savingBookUseCase) DepositOnline(ctx context.Context, input *presenter.
 	}
 
 	reg := &domain.Regulation{
-		RegulationIdRef:  latestReg.Id,
-		ApplyDate: time.Time{},
-		Name:             selectedReq.Name,
-		TermInMonth:      selectedReq.Term,
-		InterestRate:     selectedReq.InterestRate,
-		MinWithDrawValue: latestReg.MinWithdrawValue,
-		MinWithDrawDay:   latestReg.MinWithdrawDay,
+		RegulationIdRef:    latestReg.Id,
+		ApplyDate:          time.Time{},
+		Name:               selectedReq.Name,
+		TermInMonth:        selectedReq.Term,
+		InterestRate:       selectedReq.InterestRate,
+		MinWithDrawValue:   latestReg.MinWithdrawValue,
+		MinWithDrawDay:     latestReg.MinWithdrawDay,
 		NoTermInterestRate: noTermReq.InterestRate,
 	}
-
 
 	savingBook.Regulations = append(savingBook.Regulations, *reg)
 	savingBook.Status = saving_book.SavingBookInit
@@ -101,7 +100,7 @@ func (s *savingBookUseCase) DepositOnline(ctx context.Context, input *presenter.
 		if err = session.StartTransaction(); err != nil {
 			return err
 		}
-		_, err = s.savingBookRepo.Update(ctx, savingBook, savingBook.Id.Hex(), []string{"Regulations","Status"})
+		_, err = s.savingBookRepo.Update(ctx, savingBook, savingBook.Id.Hex(), []string{"Regulations", "Status"})
 		if err != nil {
 			_ = session.AbortTransaction(sessionContext)
 			return err
@@ -155,7 +154,7 @@ func (s *savingBookUseCase) WithdrawOnline(ctx context.Context, input *presenter
 		if err = session.StartTransaction(); err != nil {
 			return err
 		}
-		_, err = s.savingBookRepo.Update(sessionContext, savingBook,savingBook.Id.Hex(), []string{"Balance"})
+		_, err = s.savingBookRepo.Update(sessionContext, savingBook, savingBook.Id.Hex(), []string{"Balance"})
 		if err != nil {
 			_ = session.AbortTransaction(sessionContext)
 			return err
@@ -243,7 +242,7 @@ func (s *savingBookUseCase) HandleWithdraw(ctx context.Context, input *event.Wit
 	return nil
 }
 
-func (s *savingBookUseCase) ConfirmPaymentOnline(ctx context.Context, paymentId ,userId string) error {
+func (s *savingBookUseCase) ConfirmPaymentOnline(ctx context.Context, paymentId, userId string) error {
 
 	ticket, err := s.ticketRepo.GetByField(ctx, "PaymentId", paymentId)
 	if err != nil {
@@ -285,8 +284,7 @@ func (s *savingBookUseCase) ConfirmPaymentOnline(ctx context.Context, paymentId 
 		ticket.TransactionDate = time.Now()
 		ticket.SetSysUpdate()
 
-
-		nextMonth  := time.Now().AddDate(0, 1, 1)
+		nextMonth := time.Now().AddDate(0, 1, 1)
 		savingBook.Balance += ticket.PaymentAmount
 		updateFields := []string{"Balance", "NextScheduleMonth"}
 
@@ -311,7 +309,7 @@ func (s *savingBookUseCase) ConfirmPaymentOnline(ctx context.Context, paymentId 
 			_ = session.AbortTransaction(ctx)
 			return err
 		}
-		_, err = s.ticketRepo.Update(ctx, ticket, ticket.Id.Hex(),[]string{"Status", "PaymentLink", "TransactionDate", "Email"})
+		_, err = s.ticketRepo.Update(ctx, ticket, ticket.Id.Hex(), []string{"Status", "PaymentLink", "TransactionDate", "Email"})
 		if err != nil {
 			_ = session.AbortTransaction(ctx)
 			return err
@@ -342,13 +340,13 @@ func (s *savingBookUseCase) CreateSavingBookOnline(ctx context.Context, input *p
 	}
 
 	reg := &domain.Regulation{
-		RegulationIdRef:  regulation.Id,
-		ApplyDate: time.Time{},
-		Name:             selectedReq.Name,
-		TermInMonth:      selectedReq.Term,
-		InterestRate:     selectedReq.InterestRate,
-		MinWithDrawValue: regulation.MinWithdrawValue,
-		MinWithDrawDay:   regulation.MinWithdrawDay,
+		RegulationIdRef:    regulation.Id,
+		ApplyDate:          time.Time{},
+		Name:               selectedReq.Name,
+		TermInMonth:        selectedReq.Term,
+		InterestRate:       selectedReq.InterestRate,
+		MinWithDrawValue:   regulation.MinWithdrawValue,
+		MinWithDrawDay:     regulation.MinWithdrawDay,
 		NoTermInterestRate: noTermReq.InterestRate,
 	}
 
@@ -453,7 +451,6 @@ func (s *savingBookUseCase) revertBalanceAndNotify(ctx context.Context, input *e
 
 	return nil
 }
-
 
 func NewSavingBookUseCase(regulationRepo regulation.SavingRegulationRepository, savingBookRepo saving_book.SavingBookRepository, ticketRepo transaction_ticket.TransactionTicketRepository, paymentUC payment.PaymentUseCase, notificationUC notification.UseCase, kafkaProducer *kafka2.KafkaProducer) saving_book.UseCase {
 	return &savingBookUseCase{regulationRepo: regulationRepo, savingBookRepo: savingBookRepo, ticketRepo: ticketRepo, paymentUC: paymentUC, notificationUC: notificationUC, kafkaProducer: kafkaProducer}

@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"SavingBooks/internal/auth/middleware"
+	monthly_saving_interest "SavingBooks/internal/monthly-saving-interest"
 	saving_book "SavingBooks/internal/saving-book"
 	kafka2 "SavingBooks/internal/services/kafka"
 	"SavingBooks/internal/services/websocket"
@@ -38,13 +39,18 @@ import (
 
 	notificationRepo "SavingBooks/internal/notification/repository"
 	notificationUC "SavingBooks/internal/notification/usecase"
+
+	monthlyRepo "SavingBooks/internal/monthly-saving-interest/repository"
+	monthlyUC "SavingBooks/internal/monthly-saving-interest/usecase"
+
 )
 
-func (s *Server) MapHandlers(g *gin.Engine) (saving_book.UseCase, saving_book.SavingBookRepository, error) {
+func (s *Server) MapHandlers(g *gin.Engine) (saving_book.UseCase, saving_book.SavingBookRepository, monthly_saving_interest.Repository, error) {
 	db := s.db.Database(s.cfg.DatabaseName)
 
 
 	userRepo := authRepo.NewUserRepository(db,"Users")
+	monthlyRepo := monthlyRepo.NewMonthlySavingInterestRepository(s.db,db,"MonthlySavingInterest",)
 	roleRepo := roleRepo.NewRoleRepository(db, "Roles")
 	regulationRepo := regulationRepo.NewSavingRepository(db, "Regulations")
 	savingBookRepo := savingBookRepo.NewSavingBookRepository(db, "SavingBook")
@@ -63,7 +69,8 @@ func (s *Server) MapHandlers(g *gin.Engine) (saving_book.UseCase, saving_book.Sa
 	regulationUC := regulationUC.NewSavingRegulationUseCase(regulationRepo)
 	notificationUC := notificationUC.NewNotificationUseCase(notificationRepo, s.hub)
 	savingBookUC := savingBookUC.NewSavingBookUseCase(regulationRepo,savingBookRepo,ticketRepo, paymentUC,notificationUC, kafkaProducer)
-	ticketUC := ticketUc.NewTransactionTicketUseCase(ticketRepo)
+	ticketUC := ticketUc.NewTransactionTicketUseCase(ticketRepo, savingBookRepo)
+	monthlyUC := monthlyUC.NewMonthlyUC(monthlyRepo)
 
 
 	testHandler := testHttp.NewTestServiceHandler(testUC)
@@ -71,7 +78,7 @@ func (s *Server) MapHandlers(g *gin.Engine) (saving_book.UseCase, saving_book.Sa
 	roleHandler := roleHttp.NewRoleHandler(roleUc)
 	paymentHandler := paymentHttp.NewPaymentHandler(paymentUC)
 	regulationHandler := regulationHttp.NewSavingRegulationHandler(regulationUC)
-	savingBookHandler := savingBookHttp.NewSavingBookHandler(savingBookUC)
+	savingBookHandler := savingBookHttp.NewSavingBookHandler(savingBookUC, ticketUC, monthlyUC)
 	ticketHandler := ticketHttp.NewTransactionTicketHandler(ticketUC)
 
 
@@ -106,9 +113,9 @@ func (s *Server) MapHandlers(g *gin.Engine) (saving_book.UseCase, saving_book.Sa
 	ctx := context.Background()
 	if err := roleRepo.SeedRole(ctx); err != nil {
 		fmt.Println("Something wrong with seed roles")
-		return savingBookUC,savingBookRepo, err
+		return savingBookUC,savingBookRepo, monthlyRepo,err
 	}
 
 
-	return savingBookUC,savingBookRepo, nil
+	return savingBookUC,savingBookRepo, monthlyRepo, nil
 }
