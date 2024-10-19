@@ -39,7 +39,7 @@ func (s *Scheduler) handleSavingBook() {
 	now := time.Now()
 	filterDate := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
 
-	filter := bson.M{"NextScheduleMonth": filterDate}
+	filter := bson.M{"NextScheduleMonth": filterDate, "Status": saving_book.SavingBookActive}
 
 	cursor, err := collection.Find(context.Background(), filter)
 

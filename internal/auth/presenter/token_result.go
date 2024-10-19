@@ -2,5 +2,5 @@ package presenter
 
 type TokenResult struct {
 	UserId string
-	Roles []string
+	Roles map[string]interface{}
 }

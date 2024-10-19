@@ -55,11 +55,9 @@ func (mw *MiddleWareManager) RoleValidation(reqRoles []string) gin.HandlerFunc{
 			return
 		}
 		mapReqRoles := utils.SliceToMap[string](reqRoles)
-		mapUserRoles := utils.SliceToMap[string](userRoles)
 
 		hasAccess := false
-		for userRole := range mapUserRoles{
-
+		for userRole := range userRoles{
 			if _, ok := mapReqRoles[userRole]; ok {
 				hasAccess = true
 				break

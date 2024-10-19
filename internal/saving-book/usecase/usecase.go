@@ -8,6 +8,7 @@ import (
 	"log"
 	"time"
 
+	presenter3 "SavingBooks/internal/auth/presenter"
 	"SavingBooks/internal/contracts"
 	"SavingBooks/internal/contracts/paypal"
 	"SavingBooks/internal/domain"
@@ -34,10 +35,13 @@ type savingBookUseCase struct {
 	kafkaProducer  *kafka2.KafkaProducer
 }
 
-func (s *savingBookUseCase) WithdrawOnline(ctx context.Context, input *presenter.WithDrawInput, savingBookId string) error {
+func (s *savingBookUseCase) WithdrawOnline(ctx context.Context, input *presenter.WithDrawInput, savingBookId, userId string) error {
 	savingBook, err := s.savingBookRepo.Get(ctx, savingBookId)
 	if err != nil {
 		return err
+	}
+	if savingBook.CreatorId.Hex() != userId {
+		return errors.New(saving_book.NotSavingBookOwnerError)
 	}
 	if savingBook.Balance < input.Amount {
 		return errors.New(saving_book.InsufficientBalance)
@@ -54,7 +58,7 @@ func (s *savingBookUseCase) WithdrawOnline(ctx context.Context, input *presenter
 		PaymentType:     saving_book.TransactionTypeWithdraw,
 		PaymentAmount:   input.Amount,
 	}
-	ticket.SetInit()
+	ticket.SetCreate(userId)
 
 	session, err := s.ticketRepo.GetMongoClient().StartSession()
 	if err != nil {
@@ -154,11 +158,14 @@ func (s *savingBookUseCase) HandleWithdraw(ctx context.Context, input *event.Wit
 	return nil
 }
 
-func (s *savingBookUseCase) ConfirmPaymentOnline(ctx context.Context, paymentId string) error {
+func (s *savingBookUseCase) ConfirmPaymentOnline(ctx context.Context, paymentId ,userId string) error {
 
 	ticket, err := s.ticketRepo.GetByField(ctx, "PaymentId", paymentId)
 	if err != nil {
 		return err
+	}
+	if ticket.CreatorId.Hex() != userId {
+		return errors.New(saving_book.NotSavingBookOwnerError)
 	}
 
 	savingBook, err := s.savingBookRepo.Get(ctx, ticket.SavingBookId.Hex())
@@ -292,6 +299,8 @@ func (s *savingBookUseCase) CreateSavingBookOnline(ctx context.Context, input *p
 			PaymentId:       resp.Id,
 			PaymentAmount:   input.NewPaymentAmount,
 		}
+		ticket.SetCreate(creatorId)
+
 		err = s.ticketRepo.Create(sessionContext, ticket)
 		if err != nil {
 			_ = session.AbortTransaction(sessionContext)
@@ -307,8 +316,16 @@ func (s *savingBookUseCase) CreateSavingBookOnline(ctx context.Context, input *p
 	return entity, nil
 }
 
-func (s *savingBookUseCase) GetListSavingRegulation(ctx context.Context, query *contracts.Query) (*contracts.QueryResult[domain.SavingBook], error) {
-	savingBookInterfaces, err := s.savingBookRepo.GetList(ctx, query)
+func (s *savingBookUseCase) GetListSavingBook(ctx context.Context, query *contracts.Query, auth *presenter3.AuthData) (*contracts.QueryResult[domain.SavingBook], error) {
+	var savingBookInterfaces interface{}
+	var err error
+
+	if _, ok := auth.Roles["Admin"]; ok {
+		savingBookInterfaces, err = s.savingBookRepo.GetList(ctx, query)
+	} else {
+		savingBookInterfaces, err = s.savingBookRepo.GetListAuth(ctx, query, auth.UserId)
+	}
+
 	if err != nil {
 		return nil, err
 	}

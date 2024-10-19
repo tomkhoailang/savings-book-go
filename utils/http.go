@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 
+	"SavingBooks/internal/auth/presenter"
 	"SavingBooks/internal/contracts"
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
@@ -39,16 +40,16 @@ func GetUserId(c *gin.Context) (string, error){
 	}
 	return userId, nil
 }
-func GetRoles(c *gin.Context) ([]string, error){
+func GetRoles(c *gin.Context) (map[string]interface{}, error){
 	roles, exists := c.Get("roles")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Role not found in context"})
-		return []string{}, errors.New("user ID not found")
+		return map[string]interface{}{}, errors.New("user ID not found")
 	}
-	nRoles, ok := roles.([]string)
+	nRoles, ok := roles.(map[string]interface{})
 	if !ok {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Error casting roles to list string"})
-		return []string{}, errors.New("Error casting roles to list string")
+		return map[string]interface{}{}, errors.New("Error casting roles to list string")
 	}
 	return nRoles, nil
 }
@@ -178,8 +179,47 @@ func HandleGetListRequest[T any](getListFunc func(ctx context.Context, query *co
 			c.JSON(400, gin.H{"error": err.Error()})
 			return
 		}
+
 		var output contracts.QueryResult[T]
 		res, err := getListFunc(c.Request.Context(), &query)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		err = copier.Copy(&output, res)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, output)
+		return
+
+	}
+}
+func HandleGetListRequestAuth[T any](getListFunc func(ctx context.Context, query *contracts.Query, authData *presenter.AuthData ) (*contracts.QueryResult[T], error)) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var query contracts.Query
+		if err := c.ShouldBindQuery(&query); err != nil {
+			c.JSON(400, gin.H{"error": err.Error()})
+			return
+		}
+		roleNames, err := GetRoles(c)
+		if err != nil {
+			c.JSON(400, gin.H{"error": err.Error()})
+			return
+		}
+		userId, err := GetUserId(c)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		authData := &presenter.AuthData{
+			UserId: userId,
+			Roles:  roleNames,
+		}
+
+		var output contracts.QueryResult[T]
+		res, err := getListFunc(c.Request.Context(), &query, authData)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return

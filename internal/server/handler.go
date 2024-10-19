@@ -32,7 +32,9 @@ import (
 	savingBookRepo "SavingBooks/internal/saving-book/repository"
 	savingBookUC "SavingBooks/internal/saving-book/usecase"
 
+	ticketHttp "SavingBooks/internal/transaction-ticket/delivery/http"
 	ticketRepo "SavingBooks/internal/transaction-ticket/repository"
+	ticketUc "SavingBooks/internal/transaction-ticket/usecase"
 
 	notificationRepo "SavingBooks/internal/notification/repository"
 	notificationUC "SavingBooks/internal/notification/usecase"
@@ -61,6 +63,8 @@ func (s *Server) MapHandlers(g *gin.Engine) (saving_book.UseCase, saving_book.Sa
 	regulationUC := regulationUC.NewSavingRegulationUseCase(regulationRepo)
 	notificationUC := notificationUC.NewNotificationUseCase(notificationRepo, s.hub)
 	savingBookUC := savingBookUC.NewSavingBookUseCase(regulationRepo,savingBookRepo,ticketRepo, paymentUC,notificationUC, kafkaProducer)
+	ticketUC := ticketUc.NewTransactionTicketUseCase(ticketRepo)
+
 
 	testHandler := testHttp.NewTestServiceHandler(testUC)
 	authHandler := authHttp.NewAuthHandler(authUC)
@@ -68,6 +72,7 @@ func (s *Server) MapHandlers(g *gin.Engine) (saving_book.UseCase, saving_book.Sa
 	paymentHandler := paymentHttp.NewPaymentHandler(paymentUC)
 	regulationHandler := regulationHttp.NewSavingRegulationHandler(regulationUC)
 	savingBookHandler := savingBookHttp.NewSavingBookHandler(savingBookUC)
+	ticketHandler := ticketHttp.NewTransactionTicketHandler(ticketUC)
 
 
 
@@ -79,6 +84,8 @@ func (s *Server) MapHandlers(g *gin.Engine) (saving_book.UseCase, saving_book.Sa
 	paymentGroup := v1.Group("/payment")
 	regulationGroup := v1.Group("/regulation")
 	savingBookGroup := v1.Group("/saving-book")
+	ticketGroup := v1.Group("/transaction-ticket")
+
 	socketGroup := v1.Group("/ws")
 
 
@@ -91,6 +98,8 @@ func (s *Server) MapHandlers(g *gin.Engine) (saving_book.UseCase, saving_book.Sa
 	paymentHttp.MapAuthRoutes(paymentGroup, paymentHandler)
 	regulationHttp.MapAuthRoutes(regulationGroup, regulationHandler, mw)
 	savingBookHttp.MapAuthRoutes(savingBookGroup, savingBookHandler, mw)
+	ticketHttp.MapAuthRoutes(ticketGroup, ticketHandler, mw)
+
 	websocket.MapAuthRoutes(socketGroup, s.hub, mw)
 
 

@@ -13,6 +13,7 @@ type GenericRepository[T any] interface {
 	Delete(ctx context.Context, deleterId string, id string) error
 	DeleteMany(ctx context.Context, deleterId string, ids []string) error
 	GetList(ctx context.Context, query interface{}) (interface{}, error)
+	GetListAuth(ctx context.Context, query interface{}, currentUserId string) (interface{}, error)
 	CountAll(ctx context.Context) (int, error)
 	GetCollection() interface{}
 }

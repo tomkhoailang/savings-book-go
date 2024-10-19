@@ -139,10 +139,19 @@ func (a *authUserCase) ParseAccessToken(accessToken string) (*presenter.TokenRes
 	if err != nil {
 		return nil, err
 	}
+
+	setRoles := map[string]interface{}{}
+
+
+
 	if claims, ok := token.Claims.(*AuthClaims); ok && token.Valid {
+		for _, role := range claims.Roles {
+			setRoles[role] = struct {
+			}{}
+		}
 		return &presenter.TokenResult{
 			UserId: claims.UserId.Hex(),
-			Roles: claims.Roles,
+			Roles: setRoles,
 		}, nil
 	}
 	return nil, auth.ErrInvalidAccessToken

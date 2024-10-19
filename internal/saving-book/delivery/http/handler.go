@@ -29,7 +29,13 @@ func (s *savingBookHandler) WithDrawOnline() gin.HandlerFunc {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		err = s.savingBookUC.WithdrawOnline(c, &input, savingBookId)
+		userId, err := utils.GetUserId(c)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		err = s.savingBookUC.WithdrawOnline(c, &input, savingBookId, userId)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
@@ -40,15 +46,11 @@ func (s *savingBookHandler) WithDrawOnline() gin.HandlerFunc {
 	}
 }
 
-func (s *savingBookHandler) CreateSavingBook() gin.HandlerFunc {
-	//TODO implement me
-	panic("implement me")
-}
 func (s *savingBookHandler) GetListSavingBook() gin.HandlerFunc {
-	return utils.HandleGetListRequest[domain.SavingBook](s.savingBookUC.GetListSavingRegulation)
+	return utils.HandleGetListRequestAuth[domain.SavingBook](s.savingBookUC.GetListSavingBook)
 }
 
-func (s *savingBookHandler) CreateSavingBookGuest() gin.HandlerFunc {
+func (s *savingBookHandler) CreateSavingBookOnline() gin.HandlerFunc {
 	return utils.HandleCreateRequest[presenter.SavingBookGuestInput, presenter.SavingBookOutput, domain.SavingBook](s.savingBookUC.CreateSavingBookOnline)
 }
 
@@ -62,7 +64,13 @@ func (s *savingBookHandler) ConfirmPayment() gin.HandlerFunc {
 			return
 		}
 
-		err := s.savingBookUC.ConfirmPaymentOnline(c.Request.Context(), input.PaymentId)
+		userId, err := utils.GetUserId(c)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		err = s.savingBookUC.ConfirmPaymentOnline(c.Request.Context(), input.PaymentId, userId)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return

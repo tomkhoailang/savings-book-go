@@ -15,7 +15,7 @@ type Query struct {
 func(query *Query) QueryBuilder() (bson.M, *options.FindOptions) {
 	filter := bson.M{"IsDeleted": false}
 	if query.Keyword != "" {
-		filter["keyword"] = bson.M{"$regex": query.Keyword, "$options": "i"}
+		filter["Keyword"] = bson.M{"$regex": query.Keyword, "$options": "i"}
 	}
 	options := options.Find()
 	if query.Max == 0 {

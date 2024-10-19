@@ -7,11 +7,11 @@ import (
 )
 
 func MapAuthRoutes(authGroup *gin.RouterGroup,s saving_book.Handler, mw *middleware.MiddleWareManager) {
-	adminOnly := mw.RoleValidation([]string {"Admin"})
+	//adminOnly := mw.RoleValidation([]string {"Admin"})
 	authGroup.Use(mw.JWTValidation())
-	authGroup.POST("",adminOnly,s.CreateSavingBookGuest())
-	authGroup.GET("",adminOnly,s.GetListSavingBook())
-	authGroup.POST("/confirm-payment",adminOnly,s.ConfirmPayment())
+	authGroup.POST("",s.CreateSavingBookOnline())
+	authGroup.GET("",s.GetListSavingBook())
+	authGroup.POST("/confirm-payment",s.ConfirmPayment())
 	authGroup.POST("/:id/withdraw-online",s.WithDrawOnline())
 
 }

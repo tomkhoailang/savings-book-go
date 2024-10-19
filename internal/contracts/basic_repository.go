@@ -160,6 +160,44 @@ func (r *BaseRepository[T]) GetList(ctx context.Context, query interface{}) (int
 
 	filter, options := query.(*Query).QueryBuilder()
 
+	options.SetSort(bson.D{{"CreationTime", -1}})
+
+	totalCount, err := collection.CountDocuments(ctx, filter)
+	if err != nil {
+		return nil, err
+	}
+
+	cursor, err := collection.Find(ctx, filter, options)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var entities []T
+	if err := cursor.All(ctx, &entities); err != nil {
+		return nil, err
+	}
+	queryResult := &QueryResult[T]{
+		TotalCount: int(totalCount),
+		Items:      entities,
+	}
+
+	return queryResult, nil
+}
+func (r *BaseRepository[T]) GetListAuth(ctx context.Context, query interface{}, currentUserId string) (interface{}, error) {
+	collection := r.db.Collection(r.collectionName)
+
+	filter, options := query.(*Query).QueryBuilder()
+
+	userId, err := primitive.ObjectIDFromHex(currentUserId)
+	if err != nil {
+		return nil, errors.New("invalid ObjectID: " + currentUserId)
+	}
+
+	filter["CreatorId"] = userId
+
+	options.SetSort(bson.D{{"CreationTime", -1}})
+
 	totalCount, err := collection.CountDocuments(ctx, filter)
 	if err != nil {
 		return nil, err
@@ -195,7 +233,10 @@ func (r *BaseRepository[T]) GetMany(ctx context.Context, ids []string) (*[]T, er
 	}
 	filter := bson.M{"_id": bson.M{"$in": objectIds}}
 
-	cursor, err := collection.Find(ctx, filter)
+	findOptions:= options.Find()
+	findOptions.SetSort(bson.D{{"CreationTime", -1}})
+
+	cursor, err := collection.Find(ctx, filter, findOptions)
 	if err != nil {
 		return nil, err
 	}
