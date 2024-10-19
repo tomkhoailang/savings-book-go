@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"strings"
 	"time"
@@ -38,7 +39,7 @@ func (p *paymentUseCase) SendPayout(ctx context.Context, payoutRequest *paypal.U
 			{
 				RecipientType: "EMAIL",
 				Amount: paypal.PayoutAmount{
-					Value: fmt.Sprintf("%.2f", payoutRequest.Amount), Currency: "USD" ,
+					Value: fmt.Sprintf("%.2f", math.Ceil(payoutRequest.Amount*100)/100), Currency: "USD" ,
 				},
 				Note: "Thanks for your patronage!",
 				SenderItemID: fmt.Sprintf("Batch_%s",time.Now().Format("20060102 150405")),

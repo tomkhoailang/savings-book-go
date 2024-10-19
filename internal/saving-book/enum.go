@@ -1,25 +1,12 @@
 ﻿package saving_book
 
 var (
-	WaitingForDeposit = "waiting for deposit payment"
-	WaitingForInit = "waiting for init payment"
-	SavingBookActive = "active"
+	SavingBookActive  = "active"
 	SavingBookExpired = "expired"
-	SavingBookInit = "init"
-
-	TransactionStatusConfirmed = "confirmed"
-	TransactionStatusFailed = "failed"
-	TransactionStatusWaiting = "waiting"
-
-
+	SavingBookInit    = "init"
 )
 
 var (
-	MethodOnline = "online"
-	MethodOffline = "offline"
-)
-var (
-	TransactionTypeInit = "init"
-	TransactionTypeDeposit = "deposit"
+	TransactionTypeDeposit  = "deposit"
 	TransactionTypeWithdraw = "withdraw"
 )

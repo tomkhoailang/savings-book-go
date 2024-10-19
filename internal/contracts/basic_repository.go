@@ -51,6 +51,8 @@ func (r *BaseRepository[T]) GetByField(ctx context.Context, field string, value 
 		queryValue = v
 	case bool:
 		queryValue = v
+	case primitive.ObjectID:
+		queryValue = v
 	default:
 		return nil, fmt.Errorf("unsupported value type: %T", v)
 	}
@@ -225,12 +227,13 @@ func (r *BaseRepository[T]) GetListAuthOnReference(ctx context.Context, query in
 
 	filter, options := query.(*Query).QueryBuilder()
 
-	userId, err := primitive.ObjectIDFromHex(currentUserId)
-	if err != nil {
-		return nil, errors.New("invalid ObjectID: " + currentUserId)
+	if currentUserId != "" {
+		userId, err := primitive.ObjectIDFromHex(currentUserId)
+		if err != nil {
+			return nil, errors.New("invalid ObjectID: " + currentUserId)
+		}
+		filter["CreatorId"] = userId
 	}
-
-	filter["CreatorId"] = userId
 
 	referenceId, err := primitive.ObjectIDFromHex(referenceKey)
 	if err != nil {

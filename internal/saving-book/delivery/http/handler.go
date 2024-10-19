@@ -1,11 +1,13 @@
 ﻿package http
 
 import (
+	"errors"
 	"net/http"
 
 	"SavingBooks/internal/contracts"
 	"SavingBooks/internal/domain"
 	monthly_saving_interest "SavingBooks/internal/monthly-saving-interest"
+	presenter3 "SavingBooks/internal/monthly-saving-interest/presenter"
 	saving_book "SavingBooks/internal/saving-book"
 	"SavingBooks/internal/saving-book/presenter"
 	transaction_ticket "SavingBooks/internal/transaction-ticket"
@@ -13,6 +15,7 @@ import (
 	"SavingBooks/utils"
 	"github.com/gin-gonic/gin"
 	"github.com/jinzhu/copier"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type savingBookHandler struct {
@@ -76,7 +79,7 @@ func (s *savingBookHandler) GetMonthlyInterestOfSavingBook() gin.HandlerFunc {
 			return
 		}
 
-		var output contracts.QueryResult[presenter2.TransactionTicketOutput]
+		var output contracts.QueryResult[presenter3.MonthlyInterestOutput]
 		res, err := s.monthlyUC.GetListMonthlyInterestOfSavingBook(c, &query, userId, savingBookId)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -113,6 +116,14 @@ func (s *savingBookHandler) DepositOnline() gin.HandlerFunc {
 
 		ticket, err := s.savingBookUC.DepositOnline(c, &input, savingBookId, userId)
 		if err != nil {
+			if errors.Is(err, mongo.ErrNoDocuments) {
+				c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+				return
+			}
+			if err.Error() == saving_book.CannotDepositError {
+				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+				return
+			}
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
@@ -146,6 +157,10 @@ func (s *savingBookHandler) WithDrawOnline() gin.HandlerFunc {
 
 		err = s.savingBookUC.WithdrawOnline(c, &input, savingBookId, userId)
 		if err != nil {
+			if errors.Is(err, mongo.ErrNoDocuments) {
+				c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+				return
+			}
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}

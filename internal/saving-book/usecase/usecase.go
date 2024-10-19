@@ -21,6 +21,7 @@ import (
 	kafka2 "SavingBooks/internal/services/kafka"
 	"SavingBooks/internal/services/kafka/event"
 	transaction_ticket "SavingBooks/internal/transaction-ticket"
+	"SavingBooks/utils"
 	"github.com/jinzhu/copier"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -36,6 +37,11 @@ type savingBookUseCase struct {
 }
 
 func (s *savingBookUseCase) DepositOnline(ctx context.Context, input *presenter.DepositInput, savingBookId, userId string) (*domain.TransactionTicket, error) {
+
+	if !utils.ValidateTwoDecimalPlaces(input.Amount) {
+		return nil, errors.New(utils.AmountCannotExceedTwoDecimalPlacesError)
+	}
+
 	savingBook, err := s.savingBookRepo.Get(ctx, savingBookId)
 	if err != nil {
 		return nil, err
@@ -46,6 +52,14 @@ func (s *savingBookUseCase) DepositOnline(ctx context.Context, input *presenter.
 	if savingBook.Status != saving_book.SavingBookExpired {
 		return nil, errors.New(saving_book.CannotDepositError)
 	}
+
+	//latestTicket, err := s.ticketRepo.GetByField(ctx, "SavingBookId", savingBook.Id)
+	//if err != nil {
+	//	return nil, err
+	//}
+	//if latestTicket.Status == transaction_ticket.TransactionStatusPending {
+	//	return nil, errors.New(transaction_ticket.PreviousTransactionIsNotCompletedError)
+	//}
 
 	latestReg, err := s.regulationRepo.GetLatestSavingRegulation(ctx)
 	selectedReq, err := findSavingType(input.Term, latestReg)
@@ -121,6 +135,13 @@ func (s *savingBookUseCase) DepositOnline(ctx context.Context, input *presenter.
 }
 
 func (s *savingBookUseCase) WithdrawOnline(ctx context.Context, input *presenter.WithDrawInput, savingBookId, userId string) error {
+
+	if !utils.ValidateTwoDecimalPlaces(input.Amount) {
+		return errors.New(utils.AmountCannotExceedTwoDecimalPlacesError)
+	}
+
+
+
 	savingBook, err := s.savingBookRepo.Get(ctx, savingBookId)
 	if err != nil {
 		return err
@@ -130,10 +151,30 @@ func (s *savingBookUseCase) WithdrawOnline(ctx context.Context, input *presenter
 	}
 	if savingBook.Balance < input.Amount {
 		return errors.New(saving_book.InsufficientBalance)
-	} else if savingBook.Regulations[len(savingBook.Regulations)-1].MinWithDrawValue > input.Amount {
+	}
+	lastReg := savingBook.Regulations[len(savingBook.Regulations)-1]
+	withDrawAmount := savingBook.Balance
+
+	if lastReg.TermInMonth == 0 {
+		if savingBook.Balance < input.Amount {
+			return errors.New(saving_book.InsufficientBalance)
+		}
+		if lastReg.MinWithDrawValue > input.Amount {
+			return errors.New(saving_book.MinWithdrawValueError)
+		}
+		withDrawAmount = input.Amount
+
+	}
+
+	if savingBook.Regulations[len(savingBook.Regulations)-1].MinWithDrawValue > withDrawAmount {
 		return errors.New(saving_book.MinWithdrawValueError)
 	}
-	savingBook.Balance -= input.Amount
+	updatedSavingBookField := []string{"Balance"}
+	savingBook.Balance -= withDrawAmount
+	if savingBook.Balance == 0 {
+		updatedSavingBookField = append(updatedSavingBookField, "Status")
+		savingBook.Status = saving_book.SavingBookExpired
+	}
 
 	ticket := &domain.TransactionTicket{
 		SavingBookId:    savingBook.Id,
@@ -154,7 +195,7 @@ func (s *savingBookUseCase) WithdrawOnline(ctx context.Context, input *presenter
 		if err = session.StartTransaction(); err != nil {
 			return err
 		}
-		_, err = s.savingBookRepo.Update(sessionContext, savingBook, savingBook.Id.Hex(), []string{"Balance"})
+		_, err = s.savingBookRepo.Update(sessionContext, savingBook, savingBook.Id.Hex(), updatedSavingBookField)
 		if err != nil {
 			_ = session.AbortTransaction(sessionContext)
 			return err
@@ -297,11 +338,11 @@ func (s *savingBookUseCase) ConfirmPaymentOnline(ctx context.Context, paymentId,
 			lastReg := &savingBook.Regulations[len(savingBook.Regulations)-1]
 
 			if lastReg.ApplyDate.IsZero() {
-				updateFields = append(updateFields, "ApplyDate")
+				updateFields = append(updateFields, "Regulations")
 				lastReg.ApplyDate = time.Now()
 			}
 		}
-		savingBook.NextScheduleMonth = time.Date(nextMonth.Year(), nextMonth.Month(), nextMonth.Day(), 0, 0, 0, 0, time.Local)
+		savingBook.NextScheduleMonth = time.Date(nextMonth.Year(), nextMonth.Month(), nextMonth.Day(), 0, 0, 0, 0, time.UTC)
 
 		_, err = s.savingBookRepo.Update(ctx, savingBook, savingBook.Id.Hex(), updateFields)
 
@@ -320,6 +361,11 @@ func (s *savingBookUseCase) ConfirmPaymentOnline(ctx context.Context, paymentId,
 }
 
 func (s *savingBookUseCase) CreateSavingBookOnline(ctx context.Context, input *presenter.SavingBookGuestInput, creatorId string) (*domain.SavingBook, error) {
+
+	if !utils.ValidateTwoDecimalPlaces(input.NewPaymentAmount) {
+		return nil, errors.New(utils.AmountCannotExceedTwoDecimalPlacesError)
+	}
+
 	entity := &domain.SavingBook{}
 	err := copier.Copy(entity, &input)
 	if err != nil {

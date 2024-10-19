@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log"
+	"math"
 	"time"
 
 	"SavingBooks/internal/domain"
@@ -39,7 +40,8 @@ func (s *Scheduler) handleSavingBook() {
 	savingBookInterface := s.savingBookRepo.GetCollection()
 	savingBookCollection := savingBookInterface.(*mongo.Collection)
 
-	now := time.Now()
+	//now := time.Now()
+	now := time.Date(2025, 6, 20, 0, 0, 0, 0, time.UTC)
 	filterDate := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
 
 	filter := bson.M{
@@ -79,11 +81,13 @@ func (s *Scheduler) handleSavingBook() {
 		if monthRange >= newestRegulation.TermInMonth {
 			if savingBook.Status != saving_book.SavingBookExpired {
 				updateDoc["Status"] = saving_book.SavingBookExpired
+			}else {
+				interestRate = newestRegulation.NoTermInterestRate
 			}
-			interestRate = newestRegulation.NoTermInterestRate
-
 		}
 		newBalance := savingBook.Balance * (1 + (interestRate / 100))
+		newBalance = math.Ceil(newBalance * 100) / 100
+
 		updateDoc["Balance"] = newBalance
 
 		savingBookUpdate := mongo.NewUpdateOneModel().
@@ -91,9 +95,12 @@ func (s *Scheduler) handleSavingBook() {
 			SetUpdate(bson.M{"$set": updateDoc})
 		savingOperations = append(savingOperations, savingBookUpdate)
 
+
+		monthlyAmount := math.Ceil((newBalance - savingBook.Balance) * 100) / 100
+
 		monthlyInterest := domain.MonthlySavingInterest{
 			SavingBookId: savingBook.Id,
-			Amount:       newBalance - savingBook.Balance,
+			Amount:       monthlyAmount,
 			InterestRate: interestRate,
 		}
 		monthlyInterest.SetInit()
