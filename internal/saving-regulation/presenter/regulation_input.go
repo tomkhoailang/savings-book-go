@@ -9,17 +9,17 @@ type SavingRegulationInput struct {
 	MinWithdrawValue float64      `json:"minWithdrawValue" validate:"min=10"`
 	SavingTypes      []SavingType `json:"savingTypes" validate:"required"`
 	MinWithdrawDay   int          `json:"minWithdrawDay" validate:"required"`
-	IsActive         bool         `json:"isActive" validate:"required"`
+	IsActive         bool         `json:"isActive" `
 }
 
 type SavingType struct {
 	Name         string  `json:"name"`
-	Term         int     `json:"term" validate:"min=1"`
+	Term         int     `json:"term" validate:"min=0"`
 	InterestRate float64 `json:"interestRate"`
 }
 
 func(input *SavingRegulationInput) Validate() error {
-	if len(input.SavingTypes) == 1{
+	if len(input.SavingTypes) == 0{
 		return errors.New(SavingTypeMinimumLength)
 	}
 	termSet := make(map[int]int, len(input.SavingTypes))

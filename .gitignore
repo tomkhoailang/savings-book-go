@@ -40,3 +40,5 @@ vendor/
 
 # Redis
 *.rdb
+
+# Air

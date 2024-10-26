@@ -74,7 +74,7 @@ func (ah *authHandler) SignIn() gin.HandlerFunc {
 		}
 		tokens, err := ah.useCase.SignIn(c.Request.Context(), *input)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
 		c.JSON(http.StatusCreated, *tokens)

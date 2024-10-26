@@ -25,8 +25,8 @@ func NewScheduler(sv saving_book.SavingBookRepository, monthSavingInterestRepo m
 	return &Scheduler{savingBookRepo: sv, monthSavingInterestRepo: monthSavingInterestRepo, cron: cron.New(cron.WithSeconds())}
 }
 func (s *Scheduler) Start() {
-	//_, err := c.AddFunc("@midnight", s.handleSavingBook)
-	_, err := s.cron.AddFunc("* * * * * * ", s.handleSavingBook)
+	_, err := s.cron.AddFunc("@midnight", s.handleSavingBook)
+	//_, err := s.cron.AddFunc("* * * * * * ", s.handleSavingBook)
 	if err != nil {
 		log.Println(err)
 		return
@@ -40,8 +40,8 @@ func (s *Scheduler) handleSavingBook() {
 	savingBookInterface := s.savingBookRepo.GetCollection()
 	savingBookCollection := savingBookInterface.(*mongo.Collection)
 
-	//now := time.Now()
-	now := time.Date(2025, 6, 20, 0, 0, 0, 0, time.UTC)
+	now := time.Now()
+	//now := time.Date(2025, 6, 20, 0, 0, 0, 0, time.UTC)
 	filterDate := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
 
 	filter := bson.M{

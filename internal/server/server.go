@@ -18,6 +18,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/mongo"
+	"github.com/gin-contrib/cors"
 )
 
 type Server struct {
@@ -40,6 +41,13 @@ func (s *Server) Run() error {
 
 	s.gin.Use(gin.Logger())
 	s.gin.Use(CustomRecoveryMiddleware())
+
+	config := cors.DefaultConfig()
+	config.AllowOrigins = []string{"http://localhost:3003"}
+	config.AllowMethods = []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"}
+	config.AllowHeaders = []string{"Origin", "Content-Length", "Content-Type", "Authorization"}
+	config.AllowCredentials = true
+	s.gin.Use(cors.New(config))
 
 	server := &http.Server{
 		Addr: ":" + s.cfg.Port,

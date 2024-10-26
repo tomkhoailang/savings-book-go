@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -13,6 +14,7 @@ import (
 	"github.com/golang-jwt/jwt"
 	"github.com/google/uuid"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type AuthClaims struct {
@@ -64,17 +66,25 @@ func (a *authUserCase) RenewAccessToken(ctx context.Context, req *presenter.Rene
 	return token, err
 }
 func (a *authUserCase) SignUp(ctx context.Context, creds presenter.SignUpInput) (*domain.User, error) {
-	fmtusersame := strings.ToLower(creds.Username)
-	euser, _ := a.userRepo.GetByField(ctx, "Username", fmtusersame)
-	if euser != nil {
+	fmtUsername := strings.ToLower(creds.Username)
+	fmtEmail := strings.ToLower(creds.Email)
+	existUser, err := a.userRepo.GetExistUser(ctx, fmtUsername, fmtEmail)
+	if err != nil {
+		if !errors.Is(err, mongo.ErrNoDocuments) {
+			return nil, err
+		}
+	}
+	if existUser != nil {
 		return nil, auth.ErrUserExisted
 	}
+
 	aggregateRoot := &domain.AggregateRoot{}
 	aggregateRoot.SetInit()
 	user := &domain.User{
 		AggregateRoot: *aggregateRoot,
-		Username: creds.Username,
+		Username: fmtUsername,
 		Password: creds.Password,
+		Email: fmtEmail,
 	}
 	user.HashPassword()
 
@@ -103,12 +113,18 @@ func (a *authUserCase) SignUp(ctx context.Context, creds presenter.SignUpInput) 
 }
 
 func (a *authUserCase) SignIn(ctx context.Context, creds presenter.LoginInput) (*presenter.LogInRes, error) {
-	user, _ := a.userRepo.GetByField(ctx, "Username", creds.Username)
+	fmtUsername := strings.ToLower(creds.Username)
+	user, err := a.userRepo.GetExistUser(ctx, fmtUsername, fmtUsername)
+	if err != nil {
+		if !errors.Is(err, mongo.ErrNoDocuments) {
+			return nil, err
+		}
+	}
 	if user == nil {
-		return nil, auth.ErrUserNotFound
+		return nil, auth.ErrLoginCredentials
 	}
 	if !user.ComparePassword(creds.Password) {
-		return nil, auth.ErrWrongPassword
+		return nil, auth.ErrLoginCredentials
 	}
 	rolesName, err := a.getRolesName(ctx, user.RoleIds)
 	refreshToken := uuid.New().String()

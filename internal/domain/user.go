@@ -1,8 +1,9 @@
 ﻿package domain
 
 import (
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"time"
+
+	"go.mongodb.org/mongo-driver/bson/primitive"
 
 	"golang.org/x/crypto/bcrypt"
 )
@@ -10,6 +11,7 @@ import (
 type User struct {
 	AggregateRoot `bson:",inline" json:",inline"`
 	Username string `bson:"Username" json:"username"`
+	Email string `bson:"Email" json:"email"`
 	Password string `bson:"Password" json:"password"`
 	RoleIds []primitive.ObjectID `bson:"RoleIds" json:"rolesIds"`
 	RefreshToken          string    `bson:"RefreshToken" json:"refresh_token"`
