@@ -6,7 +6,7 @@ import (
 )
 
 func MapAuthRoutes(authGroup *gin.RouterGroup, hub *Hub, mw *middleware.MiddleWareManager) {
-	authGroup.GET("", mw.JWTValidation(), func(context *gin.Context) {
+	authGroup.GET("", mw.WebsocketValidation(), func(context *gin.Context) {
 		ServeWs(hub, context)
 	})
 }

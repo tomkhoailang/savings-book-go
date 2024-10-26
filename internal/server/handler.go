@@ -37,12 +37,12 @@ import (
 	ticketRepo "SavingBooks/internal/transaction-ticket/repository"
 	ticketUc "SavingBooks/internal/transaction-ticket/usecase"
 
+	notificationHttp "SavingBooks/internal/notification/delivery/http"
 	notificationRepo "SavingBooks/internal/notification/repository"
 	notificationUC "SavingBooks/internal/notification/usecase"
 
 	monthlyRepo "SavingBooks/internal/monthly-saving-interest/repository"
 	monthlyUC "SavingBooks/internal/monthly-saving-interest/usecase"
-
 )
 
 func (s *Server) MapHandlers(g *gin.Engine) (saving_book.UseCase, saving_book.SavingBookRepository, monthly_saving_interest.Repository, error) {
@@ -80,6 +80,7 @@ func (s *Server) MapHandlers(g *gin.Engine) (saving_book.UseCase, saving_book.Sa
 	regulationHandler := regulationHttp.NewSavingRegulationHandler(regulationUC)
 	savingBookHandler := savingBookHttp.NewSavingBookHandler(savingBookUC, ticketUC, monthlyUC)
 	ticketHandler := ticketHttp.NewTransactionTicketHandler(ticketUC)
+	notificationHandler := notificationHttp.NewNotificationHandler(notificationUC)
 
 
 
@@ -92,6 +93,7 @@ func (s *Server) MapHandlers(g *gin.Engine) (saving_book.UseCase, saving_book.Sa
 	regulationGroup := v1.Group("/regulation")
 	savingBookGroup := v1.Group("/saving-book")
 	ticketGroup := v1.Group("/transaction-ticket")
+	notificationGroup := v1.Group("/notification")
 
 	socketGroup := v1.Group("/ws")
 
@@ -106,6 +108,7 @@ func (s *Server) MapHandlers(g *gin.Engine) (saving_book.UseCase, saving_book.Sa
 	regulationHttp.MapAuthRoutes(regulationGroup, regulationHandler, mw)
 	savingBookHttp.MapAuthRoutes(savingBookGroup, savingBookHandler, mw)
 	ticketHttp.MapAuthRoutes(ticketGroup, ticketHandler, mw)
+	notificationHttp.MapAuthRoutes(notificationGroup, notificationHandler, mw)
 
 	websocket.MapAuthRoutes(socketGroup, s.hub, mw)
 
