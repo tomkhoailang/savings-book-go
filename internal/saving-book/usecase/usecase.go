@@ -53,13 +53,13 @@ func (s *savingBookUseCase) DepositOnline(ctx context.Context, input *presenter.
 		return nil, errors.New(saving_book.CannotDepositError)
 	}
 
-	//latestTicket, err := s.ticketRepo.GetByField(ctx, "SavingBookId", savingBook.Id)
-	//if err != nil {
-	//	return nil, err
-	//}
-	//if latestTicket.Status == transaction_ticket.TransactionStatusPending {
-	//	return nil, errors.New(transaction_ticket.PreviousTransactionIsNotCompletedError)
-	//}
+	latestTicket, err := s.ticketRepo.GetByField(ctx, "SavingBookId", savingBook.Id)
+	if err != nil {
+		return nil, err
+	}
+	if latestTicket.Status == transaction_ticket.TransactionStatusPending {
+		return nil, errors.New(transaction_ticket.PreviousTransactionIsNotCompletedError)
+	}
 
 	latestReg, err := s.regulationRepo.GetLatestSavingRegulation(ctx)
 	selectedReq, err := findSavingType(input.Term, latestReg)
@@ -140,8 +140,6 @@ func (s *savingBookUseCase) WithdrawOnline(ctx context.Context, input *presenter
 		return errors.New(utils.AmountCannotExceedTwoDecimalPlacesError)
 	}
 
-
-
 	savingBook, err := s.savingBookRepo.Get(ctx, savingBookId)
 	if err != nil {
 		return err
@@ -152,23 +150,28 @@ func (s *savingBookUseCase) WithdrawOnline(ctx context.Context, input *presenter
 	if savingBook.Balance < input.Amount {
 		return errors.New(saving_book.InsufficientBalance)
 	}
-	//lastReg := savingBook.Regulations[len(savingBook.Regulations)-1]
+
+	lastReg := savingBook.Regulations[len(savingBook.Regulations)-1]
 	withDrawAmount := input.Amount
 
-	//if lastReg.TermInMonth == 0 {
-	//	if savingBook.Balance < input.Amount {
-	//		return errors.New(saving_book.InsufficientBalance)
-	//	}
-	//	if lastReg.MinWithDrawValue > input.Amount {
-	//		return errors.New(saving_book.MinWithdrawValueError)
-	//	}
-	//	withDrawAmount = input.Amount
-	//
-	//}
-	//
-	//if savingBook.Regulations[len(savingBook.Regulations)-1].MinWithDrawValue > withDrawAmount {
-	//	return errors.New(saving_book.MinWithdrawValueError)
-	//}
+
+
+	if lastReg.TermInMonth == 0 {
+		if savingBook.Balance < input.Amount {
+			return errors.New(saving_book.InsufficientBalance)
+		}
+		if lastReg.MinWithDrawValue > input.Amount {
+			return errors.New(saving_book.MinWithdrawValueError)
+		}
+		withDrawAmount = input.Amount
+
+	}else if savingBook.Status != saving_book.SavingBookExpired {
+		return errors.New(saving_book.CannotWithdrawError)
+	}
+
+	if savingBook.Regulations[len(savingBook.Regulations)-1].MinWithDrawValue > withDrawAmount {
+		return errors.New(saving_book.MinWithdrawValueError)
+	}
 	updatedSavingBookField := []string{"Balance"}
 	savingBook.Balance -= withDrawAmount
 	if savingBook.Balance == 0 {

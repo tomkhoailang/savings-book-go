@@ -8,4 +8,5 @@ var(
 	NotSavingBookOwnerError = "must be an owner to confirm payment"
 	TransactionTicketNotFound = "there is no transaction ticket with that payment id"
 	CannotDepositError = "the saving book must be in expire to deposit"
+	CannotWithdrawError = "the saving book must be in expire to withdraw when using term regulation"
 )
