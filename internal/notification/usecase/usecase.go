@@ -2,6 +2,7 @@
 
 import (
 	"context"
+	"errors"
 
 	presenter2 "SavingBooks/internal/auth/presenter"
 	"SavingBooks/internal/contracts"
@@ -14,6 +15,32 @@ import (
 type notificationUseCase struct {
 	notificationRepo notification.NotificationRepository
 	socket *websocket.Hub
+}
+
+func (n *notificationUseCase) MarkAsReadAllNotification(ctx context.Context, userId string) error {
+	err := n.notificationRepo.MarkAsReadAllNotification(ctx, userId)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (n *notificationUseCase) MarkAsReadNotification(ctx context.Context, userId, notificationId string) error {
+	currentNotification, err := n.notificationRepo.Get(ctx, notificationId)
+	if err != nil {
+		return err
+	}
+	if currentNotification.UserId.Hex() != userId {
+		return errors.New(notification.NotUserNotificationOwnerError)
+	}
+	currentNotification.IsRead = true
+
+	_, err = n.notificationRepo.Update(ctx, currentNotification, notificationId, []string{"IsRead"})
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (n *notificationUseCase) GetUserNotifications(ctx context.Context, query *contracts.Query, auth *presenter2.AuthData) (*contracts.QueryResult[domain.Notification], error) {

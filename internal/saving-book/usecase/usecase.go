@@ -152,23 +152,23 @@ func (s *savingBookUseCase) WithdrawOnline(ctx context.Context, input *presenter
 	if savingBook.Balance < input.Amount {
 		return errors.New(saving_book.InsufficientBalance)
 	}
-	lastReg := savingBook.Regulations[len(savingBook.Regulations)-1]
-	withDrawAmount := savingBook.Balance
+	//lastReg := savingBook.Regulations[len(savingBook.Regulations)-1]
+	withDrawAmount := input.Amount
 
-	if lastReg.TermInMonth == 0 {
-		if savingBook.Balance < input.Amount {
-			return errors.New(saving_book.InsufficientBalance)
-		}
-		if lastReg.MinWithDrawValue > input.Amount {
-			return errors.New(saving_book.MinWithdrawValueError)
-		}
-		withDrawAmount = input.Amount
-
-	}
-
-	if savingBook.Regulations[len(savingBook.Regulations)-1].MinWithDrawValue > withDrawAmount {
-		return errors.New(saving_book.MinWithdrawValueError)
-	}
+	//if lastReg.TermInMonth == 0 {
+	//	if savingBook.Balance < input.Amount {
+	//		return errors.New(saving_book.InsufficientBalance)
+	//	}
+	//	if lastReg.MinWithDrawValue > input.Amount {
+	//		return errors.New(saving_book.MinWithdrawValueError)
+	//	}
+	//	withDrawAmount = input.Amount
+	//
+	//}
+	//
+	//if savingBook.Regulations[len(savingBook.Regulations)-1].MinWithDrawValue > withDrawAmount {
+	//	return errors.New(saving_book.MinWithdrawValueError)
+	//}
 	updatedSavingBookField := []string{"Balance"}
 	savingBook.Balance -= withDrawAmount
 	if savingBook.Balance == 0 {

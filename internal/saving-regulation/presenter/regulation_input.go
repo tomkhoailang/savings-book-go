@@ -8,7 +8,7 @@ import (
 type SavingRegulationInput struct {
 	MinWithdrawValue float64      `json:"minWithdrawValue" validate:"min=10"`
 	SavingTypes      []SavingType `json:"savingTypes" validate:"required"`
-	MinWithdrawDay   int          `json:"minWithdrawDay" validate:"required"`
+	MinWithdrawDay   int          `json:"minWithdrawDay" validate:"required,min=0"`
 	IsActive         bool         `json:"isActive" `
 }
 

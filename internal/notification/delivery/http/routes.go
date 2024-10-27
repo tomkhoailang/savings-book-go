@@ -9,4 +9,6 @@ import (
 func MapAuthRoutes(authGroup *gin.RouterGroup, n notification.Handler, mw *middleware.MiddleWareManager) {
 	authGroup.Use(mw.JWTValidation())
 	authGroup.GET("", n.GetUserNotifications())
+	authGroup.PUT("/:id", n.MarkAsReadNotification())
+	authGroup.PUT("", n.MarkAsReadAllNotification())
 }

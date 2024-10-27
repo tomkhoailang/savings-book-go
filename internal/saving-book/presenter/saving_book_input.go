@@ -8,7 +8,7 @@ type SavingBookGuestInput struct {
 	Address      contracts.Address ` json:"address" validate:"required"`
 	IdCardNumber string            ` json:"idCardNumber" validate:"required,min=12" `
 	Term         int            ` json:"term" validate:"required"`
-	NewPaymentAmount      float64            ` json:"newPaymentAmount" validate:"required,min=10"`
+	NewPaymentAmount      float64            ` json:"newPaymentAmount" validate:"required,min=1"`
 }
 
 type ConfirmPaymentInput struct {
