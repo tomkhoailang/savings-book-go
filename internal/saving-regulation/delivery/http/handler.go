@@ -1,18 +1,35 @@
 ﻿package http
 
 import (
+	"errors"
+	"net/http"
+
 	"SavingBooks/internal/domain"
 	saving_regulation "SavingBooks/internal/saving-regulation"
 	"SavingBooks/internal/saving-regulation/presenter"
 	"SavingBooks/utils"
 	"github.com/gin-gonic/gin"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type savingRegulationHandler struct {
 	savingRegulationUC saving_regulation.SavingRegulationUseCase
 }
 
-
+func (s *savingRegulationHandler) GetLatestRegulation() gin.HandlerFunc {
+	return func(c * gin.Context) {
+		latestReq, err := s.savingRegulationUC.GetLatestSavingRegulation(c)
+		if err != nil {
+			if errors.Is(err, mongo.ErrNoDocuments) {
+				c.JSON(http.StatusNotFound, gin.H{})
+				return
+			}
+			c.JSON(http.StatusInternalServerError, gin.H{})
+			return
+		}
+		c.JSON(http.StatusOK, latestReq)
+	}
+}
 
 func (s *savingRegulationHandler) CreateRegulation() gin.HandlerFunc {
 	return utils.HandleCreateRequest[presenter.SavingRegulationInput, presenter.SavingRegulationOutput, domain.SavingRegulation](s.savingRegulationUC.CreateRegulation)

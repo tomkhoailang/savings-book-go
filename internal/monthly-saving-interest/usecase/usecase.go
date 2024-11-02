@@ -9,13 +9,14 @@ import (
 )
 
 type monthlyUC struct {
-	monthlyRepo monthly_saving_interest.Repository
+	monthlyRepo  monthly_saving_interest.Repository
+
 }
 
 func (m *monthlyUC) GetListMonthlyInterestOfSavingBook(ctx context.Context, query *contracts.Query, userId, savingBookId string) (*contracts.QueryResult[domain.MonthlySavingInterest], error) {
-	var  monthlyInterfaces interface{}
+	var monthlyInterfaces interface{}
 	var err error
-	monthlyInterfaces, err = m.monthlyRepo.GetListAuthOnReference(ctx, query, "","SavingBookId", savingBookId)
+	monthlyInterfaces, err = m.monthlyRepo.GetListAuthOnReference(ctx, query, "", "SavingBookId", savingBookId)
 	if err != nil {
 		return nil, err
 	}

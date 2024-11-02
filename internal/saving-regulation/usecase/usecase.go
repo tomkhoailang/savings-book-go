@@ -7,11 +7,14 @@ import (
 	"SavingBooks/internal/domain"
 	saving_regulation "SavingBooks/internal/saving-regulation"
 	"SavingBooks/internal/saving-regulation/presenter"
+	"SavingBooks/internal/services/redis"
+	"SavingBooks/internal/services/redis/redis_key"
 	"github.com/jinzhu/copier"
 )
 
 type savingRegulationUseCase struct {
 	savingRegulationRepo saving_regulation.SavingRegulationRepository
+	cacheService *redis.Cache
 }
 
 func (s *savingRegulationUseCase) CreateRegulation(ctx context.Context, input *presenter.SavingRegulationInput, creatorId string) (*domain.SavingRegulation, error) {
@@ -26,9 +29,12 @@ func (s *savingRegulationUseCase) CreateRegulation(ctx context.Context, input *p
 	}
 	regulation.SetCreate(creatorId)
 	err = s.savingRegulationRepo.Create(ctx, regulation)
+
 	if err != nil {
 		return nil, err
 	}
+	_ = s.cacheService.RemoveValue(ctx, redis_key.LatestRegulation)
+
 	return regulation, nil
 }
 
@@ -43,6 +49,7 @@ func (s *savingRegulationUseCase) UpdateRegulation(ctx context.Context, input *p
 	if err != nil {
 		return nil, err
 	}
+	_ = s.cacheService.RemoveValue(ctx, redis_key.LatestRegulation)
 	return regulation, nil
 }
 
@@ -64,7 +71,10 @@ func (s *savingRegulationUseCase) GetListRegulation(ctx context.Context, query *
 	return regulations, nil
 
 }
+func (s *savingRegulationUseCase) GetLatestSavingRegulation(ctx context.Context) (*domain.SavingRegulation, error) {
+	return s.cacheService.GetLatestSavingRegulation(ctx)
+}
 
-func NewSavingRegulationUseCase(savingRegulationRepo saving_regulation.SavingRegulationRepository) saving_regulation.SavingRegulationUseCase {
-	return &savingRegulationUseCase{savingRegulationRepo: savingRegulationRepo}
+func NewSavingRegulationUseCase(savingRegulationRepo saving_regulation.SavingRegulationRepository, cacheService *redis.Cache) saving_regulation.SavingRegulationUseCase {
+	return &savingRegulationUseCase{savingRegulationRepo: savingRegulationRepo, cacheService: cacheService}
 }

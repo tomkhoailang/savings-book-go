@@ -17,4 +17,5 @@ type GenericRepository[T any] interface {
 	GetListAuthOnReference(ctx context.Context, query interface{}, currentUserId, referenceField, referenceKey string) (interface{}, error)
 	CountAll(ctx context.Context) (int, error)
 	GetCollection() interface{}
+	ExistsByFields(ctx context.Context, fields map[string]interface{}) (bool, error)
 }

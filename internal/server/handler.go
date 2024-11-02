@@ -8,6 +8,7 @@ import (
 	monthly_saving_interest "SavingBooks/internal/monthly-saving-interest"
 	saving_book "SavingBooks/internal/saving-book"
 	kafka2 "SavingBooks/internal/services/kafka"
+	"SavingBooks/internal/services/redis"
 	"SavingBooks/internal/services/websocket"
 	"github.com/gin-gonic/gin"
 
@@ -59,16 +60,17 @@ func (s *Server) MapHandlers(g *gin.Engine) (saving_book.UseCase, saving_book.Sa
 
 
 
-	kafkaProducer := kafka2.NewKafkaProducer("localhost:9092")
+	kafkaProducer := kafka2.NewKafkaProducer(s.cfg.KafkaBroker)
+	cacheService := redis.NewCacheService(s.cfg, regulationRepo)
 
 
 	testUC := testUC.NewTestServiceUseCase(kafkaProducer, s.hub)
 	authUC := authUC.NewAuthUseCase(userRepo, roleRepo, s.cfg.HashSalt, []byte(s.cfg.JwtSecret), s.cfg.TokenDuration, s.cfg.RefreshTokenDuration)
 	roleUc := roleUC.NewRoleUseCase(roleRepo)
 	paymentUC := paymentUC.NewPaymentUseCase(s.cfg.ClientId, s.cfg.ClientSecret)
-	regulationUC := regulationUC.NewSavingRegulationUseCase(regulationRepo)
+	regulationUC := regulationUC.NewSavingRegulationUseCase(regulationRepo, cacheService)
 	notificationUC := notificationUC.NewNotificationUseCase(notificationRepo, s.hub)
-	savingBookUC := savingBookUC.NewSavingBookUseCase(regulationRepo,savingBookRepo,ticketRepo, paymentUC,notificationUC, kafkaProducer)
+	savingBookUC := savingBookUC.NewSavingBookUseCase(savingBookRepo,ticketRepo, paymentUC,notificationUC, kafkaProducer, cacheService)
 	ticketUC := ticketUc.NewTransactionTicketUseCase(ticketRepo, savingBookRepo)
 	monthlyUC := monthlyUC.NewMonthlyUC(monthlyRepo)
 

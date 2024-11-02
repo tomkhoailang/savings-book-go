@@ -13,4 +13,5 @@ func MapAuthRoutes(authGroup *gin.RouterGroup, s saving_regulation.Handler, mw *
 	authGroup.PUT("/:id",adminOnly, s.UpdateRegulation())
 	authGroup.DELETE("",adminOnly, s.DeleteManyRegulations())
 	authGroup.GET("",s.GetListRegulations())
+	authGroup.GET("/latest",s.GetLatestRegulation())
 }

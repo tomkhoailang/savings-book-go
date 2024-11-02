@@ -7,4 +7,5 @@ type Handler interface {
 	UpdateRegulation() gin.HandlerFunc
 	DeleteManyRegulations() gin.HandlerFunc
 	GetListRegulations() gin.HandlerFunc
+	GetLatestRegulation() gin.HandlerFunc
 }

@@ -17,6 +17,8 @@ type Configuration struct {
 	DatabaseName          string `env:"DB_NAME"`
 	ClientId              string `env:"ClientId"`
 	ClientSecret          string `env:"ClientSecret"`
+	KafkaBroker                 string `env:"KAFKA_BROKER"`
+	Redis           string `env:"REDIS_SERVER"`
 }
 
 func NewConfig() *Configuration {

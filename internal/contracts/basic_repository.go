@@ -293,6 +293,18 @@ func (r *BaseRepository[T]) GetMany(ctx context.Context, ids []string) (*[]T, er
 	}
 	return &entities, nil
 }
+func (r *BaseRepository[T]) ExistsByFields(ctx context.Context, fields map[string]interface{}) (bool, error){
+	collection := r.db.Collection(r.collectionName)
+	filter := bson.M{}
+	for field, value := range fields {
+		filter[field] = value
+	}
+	count, err := collection.CountDocuments(ctx, filter)
+	if err != nil {
+		return false, err
+	}
+	return count >0, nil
+}
 
 func NewBaseRepository[T any](db *mongo.Database, collectionName string) domain.GenericRepository[T]  {
 	return &BaseRepository[T]{db: db, collectionName: collectionName}

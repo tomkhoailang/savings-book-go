@@ -17,9 +17,9 @@ import (
 	"SavingBooks/internal/payment"
 	saving_book "SavingBooks/internal/saving-book"
 	"SavingBooks/internal/saving-book/presenter"
-	regulation "SavingBooks/internal/saving-regulation"
 	kafka2 "SavingBooks/internal/services/kafka"
 	"SavingBooks/internal/services/kafka/event"
+	"SavingBooks/internal/services/redis"
 	transaction_ticket "SavingBooks/internal/transaction-ticket"
 	"SavingBooks/utils"
 	"github.com/jinzhu/copier"
@@ -29,11 +29,11 @@ import (
 
 type savingBookUseCase struct {
 	savingBookRepo saving_book.SavingBookRepository
-	regulationRepo regulation.SavingRegulationRepository
 	ticketRepo     transaction_ticket.TransactionTicketRepository
 	paymentUC      payment.PaymentUseCase
 	notificationUC notification.UseCase
 	kafkaProducer  *kafka2.KafkaProducer
+	cacheService *redis.Cache
 }
 
 func (s *savingBookUseCase) DepositOnline(ctx context.Context, input *presenter.DepositInput, savingBookId, userId string) (*domain.TransactionTicket, error) {
@@ -61,7 +61,7 @@ func (s *savingBookUseCase) DepositOnline(ctx context.Context, input *presenter.
 		return nil, errors.New(transaction_ticket.PreviousTransactionIsNotCompletedError)
 	}
 
-	latestReg, err := s.regulationRepo.GetLatestSavingRegulation(ctx)
+	latestReg, err := s.cacheService.GetLatestSavingRegulation(ctx)
 	selectedReq, err := findSavingType(input.Term, latestReg)
 
 	noTermReq, err := findSavingType(0, latestReg)
@@ -374,7 +374,7 @@ func (s *savingBookUseCase) CreateSavingBookOnline(ctx context.Context, input *p
 	if err != nil {
 		return nil, err
 	}
-	regulation, err := s.regulationRepo.GetLatestSavingRegulation(ctx)
+	regulation, err := s.cacheService.GetLatestSavingRegulation(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -501,6 +501,6 @@ func (s *savingBookUseCase) revertBalanceAndNotify(ctx context.Context, input *e
 	return nil
 }
 
-func NewSavingBookUseCase(regulationRepo regulation.SavingRegulationRepository, savingBookRepo saving_book.SavingBookRepository, ticketRepo transaction_ticket.TransactionTicketRepository, paymentUC payment.PaymentUseCase, notificationUC notification.UseCase, kafkaProducer *kafka2.KafkaProducer) saving_book.UseCase {
-	return &savingBookUseCase{regulationRepo: regulationRepo, savingBookRepo: savingBookRepo, ticketRepo: ticketRepo, paymentUC: paymentUC, notificationUC: notificationUC, kafkaProducer: kafkaProducer}
+func NewSavingBookUseCase( savingBookRepo saving_book.SavingBookRepository, ticketRepo transaction_ticket.TransactionTicketRepository, paymentUC payment.PaymentUseCase, notificationUC notification.UseCase, kafkaProducer *kafka2.KafkaProducer, cacheService *redis.Cache) saving_book.UseCase {
+	return &savingBookUseCase{ savingBookRepo: savingBookRepo, ticketRepo: ticketRepo, paymentUC: paymentUC, notificationUC: notificationUC, kafkaProducer: kafkaProducer, cacheService: cacheService}
 }
