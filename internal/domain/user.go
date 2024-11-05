@@ -3,6 +3,7 @@
 import (
 	"time"
 
+	"github.com/google/uuid"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 
 	"golang.org/x/crypto/bcrypt"
@@ -16,11 +17,20 @@ type User struct {
 	RoleIds []primitive.ObjectID `bson:"RoleIds" json:"rolesIds"`
 	RefreshToken          string    `bson:"RefreshToken" json:"refresh_token"`
 	RefreshTokenExpiresAt time.Time `bson:"RefreshTokenExpiresAt" json:"refresh_token_expires_at"`
+	ResetPasswordToken     string               `bson:"ResetPasswordToken" json:"reset_password_token"`
+	ResetPasswordExpiresAt time.Time            `bson:"ResetPasswordExpiresAt" json:"reset_password_expires_at"`
+
 }
 
 func (u *User) AssignRefreshToken(refreshToken string, expireAt time.Time) {
 	u.RefreshToken = refreshToken
 	u.RefreshTokenExpiresAt = expireAt
+}
+func (u *User) GenerateResetPassword() {
+	token := uuid.New().String()
+	expirationTime := time.Now().Add(10 * time.Minute)
+	u.ResetPasswordToken = token
+	u.ResetPasswordExpiresAt = expirationTime
 }
 
 func (u *User) HashPassword() error {

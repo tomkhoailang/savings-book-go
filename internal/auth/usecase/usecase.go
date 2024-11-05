@@ -11,6 +11,7 @@ import (
 	"SavingBooks/internal/auth/presenter"
 	"SavingBooks/internal/domain"
 	"SavingBooks/internal/role"
+	"SavingBooks/internal/services/email"
 	"github.com/golang-jwt/jwt"
 	"github.com/google/uuid"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -22,15 +23,75 @@ type AuthClaims struct {
 	Username string             `json:"username"`
 	UserId   primitive.ObjectID `json:"userId"`
 	Roles    []string           `json:"roles"`
-
 }
 type authUserCase struct {
-	userRepo       auth.UserRepository
-	roleRepo       role.RoleRepository
-	hashSalt       string
-	signingKey     []byte
+	userRepo             auth.UserRepository
+	roleRepo             role.RoleRepository
+	emailService         *email.SmtpServer
+	hashSalt             string
+	signingKey           []byte
 	accessTokenDuration  time.Duration
 	refreshTokenDuration time.Duration
+}
+
+func (a *authUserCase) ChangePassword(ctx context.Context,userId, oldPassword, newPassword string) error {
+
+	user, err := a.userRepo.Get(ctx, userId)
+	if err != nil {
+		return err
+	}
+
+	if !user.ComparePassword(oldPassword) {
+		return auth.ErrWrongPassword
+	}
+	user.Password = newPassword
+	user.HashPassword()
+	user.RefreshToken = ""
+	_, err = a.userRepo.Update(ctx, user, userId, []string{"Password", "RefreshToken"})
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (a *authUserCase) GenerateResetPassword(ctx context.Context, email string) error {
+	user, err := a.userRepo.GetByField(ctx, "Email", email)
+	if err != nil {
+		return err
+	}
+	user.GenerateResetPassword()
+	_, err = a.userRepo.Update(ctx, user, user.Id.Hex(), []string{"ResetPasswordToken", "ResetPasswordExpiresAt" })
+	if err != nil {
+		return err
+	}
+	resetLink := fmt.Sprintf("http://localhost:3003/confirm-reset-password?token=%s", user.ResetPasswordToken)
+	err = a.emailService.SendEmail(user.Email, resetLink)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+func (a *authUserCase) ConfirmResetPassword(ctx context.Context, token, password string) error{
+	user, err := a.userRepo.GetByField(ctx, "ResetPasswordToken", token)
+	if err != nil {
+		return auth.ErrInvalidResetPasswordToken
+	}
+	if user.ResetPasswordToken != token {
+		return auth.ErrInvalidResetPasswordToken
+	}
+	test := time.Now()
+	if test.After(user.ResetPasswordExpiresAt) {
+		return auth.ErrInvalidResetPasswordToken
+	}
+	user.Password = password
+	user.ResetPasswordToken = ""
+	user.HashPassword()
+
+	_, err = a.userRepo.Update(ctx, user, user.Id.Hex(), []string{"Password", "ResetPasswordToken" })
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (a *authUserCase) Logout(ctx context.Context, userId string) error {
@@ -58,7 +119,7 @@ func (a *authUserCase) RenewAccessToken(ctx context.Context, req *presenter.Rene
 		return "", auth.ErrRefreshTokenExpired
 	}
 	rolesName, err := a.getRolesName(ctx, user.RoleIds)
-	token, err := a.generateAccessToken(user,rolesName)
+	token, err := a.generateAccessToken(user, rolesName)
 	if err != nil {
 		return "", err
 
@@ -82,9 +143,9 @@ func (a *authUserCase) SignUp(ctx context.Context, creds presenter.SignUpInput) 
 	aggregateRoot.SetInit()
 	user := &domain.User{
 		AggregateRoot: *aggregateRoot,
-		Username: fmtUsername,
-		Password: creds.Password,
-		Email: fmtEmail,
+		Username:      fmtUsername,
+		Password:      creds.Password,
+		Email:         fmtEmail,
 	}
 	user.HashPassword()
 
@@ -93,17 +154,17 @@ func (a *authUserCase) SignUp(ctx context.Context, creds presenter.SignUpInput) 
 		return nil, err
 	}
 	if count == 0 {
-		roleT, ierr := a.roleRepo.GetByField(ctx ,"Name", "Admin")
+		roleT, ierr := a.roleRepo.GetByField(ctx, "Name", "Admin")
 		if ierr != nil {
 			return nil, ierr
 		}
-		user.RoleIds =  append(user.RoleIds, roleT.Id)
-	}else {
-		roleT, ierr := a.roleRepo.GetByField(ctx ,"Name", "User")
+		user.RoleIds = append(user.RoleIds, roleT.Id)
+	} else {
+		roleT, ierr := a.roleRepo.GetByField(ctx, "Name", "User")
 		if ierr != nil {
 			return nil, ierr
 		}
-		user.RoleIds =  append(user.RoleIds, roleT.Id)
+		user.RoleIds = append(user.RoleIds, roleT.Id)
 	}
 	err = a.userRepo.Create(ctx, user)
 	if err != nil {
@@ -129,11 +190,11 @@ func (a *authUserCase) SignIn(ctx context.Context, creds presenter.LoginInput) (
 	rolesName, err := a.getRolesName(ctx, user.RoleIds)
 	refreshToken := uuid.New().String()
 	user.AssignRefreshToken(refreshToken, time.Now().Add(a.refreshTokenDuration))
-	_, err = a.userRepo.Update(ctx, user, user.Id.Hex(), []string{"RefreshToken","RefreshTokenExpiresAt"})
+	_, err = a.userRepo.Update(ctx, user, user.Id.Hex(), []string{"RefreshToken", "RefreshTokenExpiresAt"})
 	if err != nil {
 		return nil, err
 	}
-	tokenString, err := a.generateAccessToken(user,rolesName)
+	tokenString, err := a.generateAccessToken(user, rolesName)
 
 	if err != nil {
 		return nil, err
@@ -158,8 +219,6 @@ func (a *authUserCase) ParseAccessToken(accessToken string) (*presenter.TokenRes
 
 	setRoles := map[string]interface{}{}
 
-
-
 	if claims, ok := token.Claims.(*AuthClaims); ok && token.Valid {
 		for _, role := range claims.Roles {
 			setRoles[role] = struct {
@@ -167,15 +226,16 @@ func (a *authUserCase) ParseAccessToken(accessToken string) (*presenter.TokenRes
 		}
 		return &presenter.TokenResult{
 			UserId: claims.UserId.Hex(),
-			Roles: setRoles,
+			Roles:  setRoles,
 		}, nil
 	}
 	return nil, auth.ErrInvalidAccessToken
 }
-func NewAuthUseCase(userRepo auth.UserRepository, roleRepo role.RoleRepository, hashSalt string, signingKey []byte, accessTokenDuration int64, refreshTokenDuration int64) auth.UseCase {
+func NewAuthUseCase(userRepo auth.UserRepository, roleRepo role.RoleRepository, emailService         *email.SmtpServer, hashSalt string, signingKey []byte, accessTokenDuration int64, refreshTokenDuration int64) auth.UseCase {
 	return &authUserCase{
 		userRepo:             userRepo,
 		roleRepo:             roleRepo,
+		emailService:         emailService,
 		hashSalt:             hashSalt,
 		signingKey:           signingKey,
 		accessTokenDuration:  time.Second * time.Duration(accessTokenDuration),
@@ -204,7 +264,7 @@ func (a *authUserCase) generateAccessToken(user *domain.User, rolesName []string
 }
 func (a *authUserCase) getRolesName(ctx context.Context, roleIds []primitive.ObjectID) ([]string, error) {
 	var idsString = make([]string, len(roleIds))
-	for i,id := range roleIds {
+	for i, id := range roleIds {
 		idsString[i] = id.Hex()
 	}
 	roles, err := a.roleRepo.GetMany(ctx, idsString)

@@ -1,16 +1,88 @@
 package http
 
 import (
+	"errors"
 	"net/http"
 
 	"SavingBooks/internal/auth"
 	"SavingBooks/internal/auth/presenter"
 	"SavingBooks/utils"
 	"github.com/gin-gonic/gin"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type authHandler struct {
 	useCase auth.UseCase
+}
+
+func (ah *authHandler) ChangePassword() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		changePasswordReq := presenter.ChangePasswordReq{}
+		err := utils.ReadRequest(c, &changePasswordReq)
+		if err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "failed to find new password in request"})
+			return
+		}
+		userId, err := utils.GetUserId(c)
+		if err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "userId not found"})
+			return
+		}
+		err = ah.useCase.ChangePassword(c, userId, changePasswordReq.OldPassword, changePasswordReq.NewPassword)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"message": "Change password successfully"})
+		return
+	}
+}
+
+func (ah *authHandler) ConfirmResetPassword() gin.HandlerFunc {
+	return func(c *gin.Context) {
+			resetPasswordConfirm := presenter.ResetPasswordConfirm{}
+			err := utils.ReadRequest(c, &resetPasswordConfirm)
+			if err != nil {
+				c.JSON(http.StatusNotFound, gin.H{"error": "password failed"})
+				return
+			}
+			token := c.Query("token")
+			if token == "" {
+				c.JSON(http.StatusNotFound, gin.H{"error": "token not found"})
+				return
+			}
+			err = ah.useCase.ConfirmResetPassword(c, token, resetPasswordConfirm.Password)
+			if err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+				return
+			}
+			c.JSON(http.StatusOK, gin.H{"message": "Reset password successfully"})
+			return
+		}
+
+}
+
+func (ah *authHandler) GenerateResetPassword() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		input := &presenter.ResetPasswordRequest{}
+
+		err := utils.ReadRequest(c, input)
+
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "userId not found"})
+		}
+		err = ah.useCase.GenerateResetPassword(c, input.Email)
+		if err != nil {
+			if errors.Is(err, mongo.ErrNoDocuments) {
+				c.JSON(http.StatusNotFound, gin.H{"message": "User not found"})
+				return
+			}
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusCreated,gin.H{"message": "Reset password is sent to your email"} )
+
+	}
 }
 
 func (ah *authHandler) LogOut() gin.HandlerFunc {
