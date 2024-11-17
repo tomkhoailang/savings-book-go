@@ -196,6 +196,30 @@ func HandleGetListRequest[T any](getListFunc func(ctx context.Context, query *co
 
 	}
 }
+func NewHandleGetListRequest[DomainEntity any, OutputEntity any](getListFunc func(ctx context.Context, query *contracts.Query ) (*contracts.QueryResult[DomainEntity], error)) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var query contracts.Query
+		if err := c.ShouldBindQuery(&query); err != nil {
+			c.JSON(400, gin.H{"error": err.Error()})
+			return
+		}
+
+		var output contracts.QueryResult[OutputEntity]
+		res, err := getListFunc(c.Request.Context(), &query)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		err = copier.Copy(&output, res)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, output)
+		return
+
+	}
+}
 func HandleGetListRequestAuth[T any](getListFunc func(ctx context.Context, query *contracts.Query, authData *presenter.AuthData ) (*contracts.QueryResult[T], error)) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var query contracts.Query

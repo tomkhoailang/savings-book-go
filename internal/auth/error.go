@@ -4,6 +4,8 @@ import "errors"
 
 var (
 	ErrUserNotFound        = errors.New("User not found")
+	ErrUserIsBlocked        = errors.New("User is blocked")
+
 	ErrWrongPassword       = errors.New("Old password incorrect")
 	ErrLoginCredentials  = errors.New("Login credentials incorrect")
 	ErrUserExisted         = errors.New("User already exists")

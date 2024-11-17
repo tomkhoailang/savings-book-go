@@ -12,6 +12,8 @@ import (
 	"SavingBooks/internal/domain"
 	"SavingBooks/internal/role"
 	"SavingBooks/internal/services/email"
+	"SavingBooks/internal/services/redis"
+	"SavingBooks/internal/services/redis/redis_key"
 	"github.com/golang-jwt/jwt"
 	"github.com/google/uuid"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -28,6 +30,7 @@ type authUserCase struct {
 	userRepo             auth.UserRepository
 	roleRepo             role.RoleRepository
 	emailService         *email.SmtpServer
+	cacheService *redis.Cache
 	hashSalt             string
 	signingKey           []byte
 	accessTokenDuration  time.Duration
@@ -59,6 +62,9 @@ func (a *authUserCase) GenerateResetPassword(ctx context.Context, email string) 
 	if err != nil {
 		return err
 	}
+	if !user.IsActive {
+		return auth.ErrUserIsBlocked
+	}
 	user.GenerateResetPassword()
 	_, err = a.userRepo.Update(ctx, user, user.Id.Hex(), []string{"ResetPasswordToken", "ResetPasswordExpiresAt" })
 	if err != nil {
@@ -75,6 +81,9 @@ func (a *authUserCase) ConfirmResetPassword(ctx context.Context, token, password
 	user, err := a.userRepo.GetByField(ctx, "ResetPasswordToken", token)
 	if err != nil {
 		return auth.ErrInvalidResetPasswordToken
+	}
+	if !user.IsActive {
+		return auth.ErrUserIsBlocked
 	}
 	if user.ResetPasswordToken != token {
 		return auth.ErrInvalidResetPasswordToken
@@ -111,6 +120,9 @@ func (a *authUserCase) RenewAccessToken(ctx context.Context, req *presenter.Rene
 	user, err := a.userRepo.Get(ctx, req.UserId)
 	if err != nil {
 		return "", err
+	}
+	if !user.IsActive {
+		return "", auth.ErrUserIsBlocked
 	}
 	if user.RefreshToken != req.RefreshToken {
 		return "", auth.ErrInvalidRefreshToken
@@ -184,6 +196,9 @@ func (a *authUserCase) SignIn(ctx context.Context, creds presenter.LoginInput) (
 	if user == nil {
 		return nil, auth.ErrLoginCredentials
 	}
+	if !user.IsActive {
+		return nil, auth.ErrUserIsBlocked
+	}
 	if !user.ComparePassword(creds.Password) {
 		return nil, auth.ErrLoginCredentials
 	}
@@ -206,7 +221,7 @@ func (a *authUserCase) SignIn(ctx context.Context, creds presenter.LoginInput) (
 	}, nil
 }
 
-func (a *authUserCase) ParseAccessToken(accessToken string) (*presenter.TokenResult, error) {
+func (a *authUserCase) ParseAccessToken(ctx context.Context, accessToken string) (*presenter.TokenResult, error) {
 	token, err := jwt.ParseWithClaims(accessToken, &AuthClaims{}, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
@@ -217,9 +232,19 @@ func (a *authUserCase) ParseAccessToken(accessToken string) (*presenter.TokenRes
 		return nil, err
 	}
 
+
+
 	setRoles := map[string]interface{}{}
 
 	if claims, ok := token.Claims.(*AuthClaims); ok && token.Valid {
+
+		var userid string
+		err = a.cacheService.GetValue(ctx, redis_key.BlockUserId, &userid)
+		if err != nil {
+			return nil, auth.ErrUserIsBlocked
+		}
+
+
 		for _, role := range claims.Roles {
 			setRoles[role] = struct {
 			}{}
@@ -231,11 +256,12 @@ func (a *authUserCase) ParseAccessToken(accessToken string) (*presenter.TokenRes
 	}
 	return nil, auth.ErrInvalidAccessToken
 }
-func NewAuthUseCase(userRepo auth.UserRepository, roleRepo role.RoleRepository, emailService         *email.SmtpServer, hashSalt string, signingKey []byte, accessTokenDuration int64, refreshTokenDuration int64) auth.UseCase {
+func NewAuthUseCase(userRepo auth.UserRepository, roleRepo role.RoleRepository, emailService         *email.SmtpServer,cacheService *redis.Cache, hashSalt string, signingKey []byte, accessTokenDuration int64, refreshTokenDuration int64) auth.UseCase {
 	return &authUserCase{
 		userRepo:             userRepo,
 		roleRepo:             roleRepo,
 		emailService:         emailService,
+		cacheService: cacheService,
 		hashSalt:             hashSalt,
 		signingKey:           signingKey,
 		accessTokenDuration:  time.Second * time.Duration(accessTokenDuration),

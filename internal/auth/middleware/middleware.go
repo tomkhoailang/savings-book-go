@@ -31,7 +31,7 @@ func (mw *MiddleWareManager) JWTValidation() gin.HandlerFunc{
 			c.AbortWithStatus(http.StatusUnauthorized)
 			return
 		}
-		result, err := mw.authUC.ParseAccessToken(headerParts[1])
+		result, err := mw.authUC.ParseAccessToken(c, headerParts[1])
 		if err != nil {
 			if errors.Is(err, auth.ErrInvalidAccessToken) {
 				c.AbortWithStatus(http.StatusUnauthorized)
@@ -54,7 +54,7 @@ func (mw *MiddleWareManager) WebsocketValidation() gin.HandlerFunc{
 			c.AbortWithStatus(http.StatusUnauthorized)
 			return
 		}
-		result, err := mw.authUC.ParseAccessToken(token)
+		result, err := mw.authUC.ParseAccessToken(c, token)
 		if err != nil {
 			if errors.Is(err, auth.ErrInvalidAccessToken) {
 				c.AbortWithStatus(http.StatusUnauthorized)

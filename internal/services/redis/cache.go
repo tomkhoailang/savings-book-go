@@ -24,11 +24,18 @@ func (c *Cache) SetValue(ctx context.Context, key string, value interface{}) err
 	}
 	return c.redis.Set(ctx, key, data, 5 * time.Minute).Err()
 }
+func (c *Cache) SetValueWithExpire(ctx context.Context, key string, value interface{}, expireTime time.Duration) error {
+	data, err := json.Marshal(value)
+	if err != nil {
+		return err
+	}
+	return c.redis.Set(ctx, key, data, expireTime).Err()
+}
 
 func (c *Cache) GetValue(ctx context.Context, key string, dest interface{}) error {
 	data, err := c.redis.Get(ctx, key).Result()
 	if err != nil {
-		return err
+		return nil
 	}
 
 	return json.Unmarshal([]byte(data), dest)

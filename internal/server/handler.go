@@ -3,6 +3,7 @@
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"SavingBooks/internal/auth/middleware"
 	monthly_saving_interest "SavingBooks/internal/monthly-saving-interest"
@@ -45,6 +46,10 @@ import (
 
 	monthlyRepo "SavingBooks/internal/monthly-saving-interest/repository"
 	monthlyUC "SavingBooks/internal/monthly-saving-interest/usecase"
+
+	userHttp "SavingBooks/internal/user/delivery/http"
+	userUC "SavingBooks/internal/user/usecase"
+
 )
 
 func (s *Server) MapHandlers(g *gin.Engine) (saving_book.UseCase, saving_book.SavingBookRepository, monthly_saving_interest.Repository, error) {
@@ -67,7 +72,8 @@ func (s *Server) MapHandlers(g *gin.Engine) (saving_book.UseCase, saving_book.Sa
 
 
 	testUC := testUC.NewTestServiceUseCase(kafkaProducer, s.hub)
-	authUC := authUC.NewAuthUseCase(userRepo, roleRepo,emailService, s.cfg.HashSalt, []byte(s.cfg.JwtSecret), s.cfg.TokenDuration, s.cfg.RefreshTokenDuration)
+	authUC := authUC.NewAuthUseCase(userRepo, roleRepo,emailService,cacheService, s.cfg.HashSalt, []byte(s.cfg.JwtSecret), s.cfg.TokenDuration, s.cfg.RefreshTokenDuration)
+	userUc := userUC.NewUserUseCase(userRepo, cacheService, time.Duration(s.cfg.TokenDuration))
 	roleUc := roleUC.NewRoleUseCase(roleRepo)
 	paymentUC := paymentUC.NewPaymentUseCase(s.cfg.ClientId, s.cfg.ClientSecret)
 	regulationUC := regulationUC.NewSavingRegulationUseCase(regulationRepo, cacheService)
@@ -79,6 +85,7 @@ func (s *Server) MapHandlers(g *gin.Engine) (saving_book.UseCase, saving_book.Sa
 
 	testHandler := testHttp.NewTestServiceHandler(testUC)
 	authHandler := authHttp.NewAuthHandler(authUC)
+	userHandler := userHttp.NewUserHandler(userUc)
 	roleHandler := roleHttp.NewRoleHandler(roleUc)
 	paymentHandler := paymentHttp.NewPaymentHandler(paymentUC)
 	regulationHandler := regulationHttp.NewSavingRegulationHandler(regulationUC)
@@ -91,6 +98,7 @@ func (s *Server) MapHandlers(g *gin.Engine) (saving_book.UseCase, saving_book.Sa
 
 	v1 := g.Group("/api/v1")
 	authGroup := v1.Group("/auth")
+	userGroup := v1.Group("/user")
 	testGroup := v1.Group("/test")
 	roleGroup := v1.Group("/role")
 	paymentGroup := v1.Group("/payment")
@@ -106,6 +114,7 @@ func (s *Server) MapHandlers(g *gin.Engine) (saving_book.UseCase, saving_book.Sa
 
 
 	authHttp.MapAuthRoutes(authGroup, authHandler, mw)
+	userHttp.MapAuthRoutes(userGroup, userHandler, mw)
 	testHttp.MapAuthRoutes(testGroup, testHandler, mw)
 	roleHttp.MapAuthRoutes(roleGroup, roleHandler, mw)
 	paymentHttp.MapAuthRoutes(paymentGroup, paymentHandler)
