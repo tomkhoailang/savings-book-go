@@ -35,9 +35,6 @@ func (c *Cache) SetValueWithExpire(ctx context.Context, key string, value interf
 func (c *Cache) GetValue(ctx context.Context, key string, dest interface{}) error {
 	data, err := c.redis.Get(ctx, key).Result()
 	if err != nil {
-		if err == redis.Nil {
-			return nil
-		}
 		return err
 	}
 	return json.Unmarshal([]byte(data), dest)
@@ -54,6 +51,7 @@ func(c *Cache) GetLatestSavingRegulation(ctx context.Context) (*domain.SavingReg
 		_ = c.SetValue(ctx, redis_key.LatestRegulation, queryReg)
 		return  queryReg, nil
 	}
+
 	return latestReg, nil
 }
 
