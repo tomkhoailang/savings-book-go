@@ -43,7 +43,7 @@ func (u* userUseCase) DisableUser(ctx context.Context, userId string) error {
 	if err != nil {
 		return err
 	}
-	err = u.cacheService.SetValueWithExpire(ctx, redis_key.BlockUserId, user.Id, u.expireTime)
+	err = u.cacheService.SetValueWithExpire(ctx, redis_key.BlockUserId +":" + userId, user.Id, u.expireTime)
 	if err != nil {
 		return err
 	}

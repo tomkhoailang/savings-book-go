@@ -238,9 +238,9 @@ func (a *authUserCase) ParseAccessToken(ctx context.Context, accessToken string)
 
 	if claims, ok := token.Claims.(*AuthClaims); ok && token.Valid {
 
-		var userid interface{}
-		_ = a.cacheService.GetValue(ctx, redis_key.BlockUserId, &userid)
-		if userid != nil {
+		var userid string
+		err = a.cacheService.GetValue(ctx, redis_key.BlockUserId+":" + claims.UserId.Hex(), &userid)
+		if err != nil {
 			return nil, auth.ErrUserIsBlocked
 		}
 
