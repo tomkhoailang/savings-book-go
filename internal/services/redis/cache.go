@@ -35,22 +35,26 @@ func (c *Cache) SetValueWithExpire(ctx context.Context, key string, value interf
 func (c *Cache) GetValue(ctx context.Context, key string, dest interface{}) error {
 	data, err := c.redis.Get(ctx, key).Result()
 	if err != nil {
-		return nil
+		if err == redis.Nil {
+			return nil
+		}
+		return err
 	}
-
 	return json.Unmarshal([]byte(data), dest)
 }
 func(c *Cache) GetLatestSavingRegulation(ctx context.Context) (*domain.SavingRegulation, error) {
-	latestRegulation := &domain.SavingRegulation{}
-	err := c.GetValue(ctx, redis_key.LatestRegulation, latestRegulation)
+	latestReg := &domain.SavingRegulation{}
+	err := c.GetValue(ctx, redis_key.LatestRegulation, latestReg)
+
 	if err != nil {
-		latestRegulation, err = c.savingRegulationRepo.GetLatestSavingRegulation(ctx)
+		queryReg, err := c.savingRegulationRepo.GetLatestSavingRegulation(ctx)
 		if err != nil {
 			return nil, err
 		}
-		_ = c.SetValue(ctx, redis_key.LatestRegulation, latestRegulation)
+		_ = c.SetValue(ctx, redis_key.LatestRegulation, queryReg)
+		return  queryReg, nil
 	}
-	return latestRegulation, nil
+	return latestReg, nil
 }
 
 func (c *Cache) RemoveValue(ctx context.Context, key string) error {
