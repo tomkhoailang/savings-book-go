@@ -82,6 +82,7 @@ func (s *savingBookUseCase) DepositOnline(ctx context.Context, input *presenter.
 
 	savingBook.Regulations = append(savingBook.Regulations, *reg)
 	savingBook.Status = saving_book.SavingBookInit
+	savingBook.PendingBalance = input.Amount;
 	savingBook.SetSysUpdate()
 
 	resp, err := s.paymentUC.CreateOrder(ctx, &paypal.InitOrderRequest{
@@ -114,7 +115,7 @@ func (s *savingBookUseCase) DepositOnline(ctx context.Context, input *presenter.
 		if err = session.StartTransaction(); err != nil {
 			return err
 		}
-		_, err = s.savingBookRepo.Update(ctx, savingBook, savingBook.Id.Hex(), []string{"Regulations", "Status"})
+		_, err = s.savingBookRepo.Update(ctx, savingBook, savingBook.Id.Hex(), []string{"Regulations", "Status","PendingBalance"})
 		if err != nil {
 			_ = session.AbortTransaction(sessionContext)
 			return err
@@ -330,7 +331,8 @@ func (s *savingBookUseCase) ConfirmPaymentOnline(ctx context.Context, paymentId,
 
 		nextMonth := time.Now().AddDate(0, 1, 1)
 		savingBook.Balance += ticket.PaymentAmount
-		updateFields := []string{"Balance", "NextScheduleMonth"}
+		savingBook.PendingBalance = 0
+		updateFields := []string{"Balance", "NextScheduleMonth", "PendingBalance"}
 
 		if savingBook.Status != saving_book.SavingBookActive {
 			updateFields = append(updateFields, "Status")
@@ -400,6 +402,7 @@ func (s *savingBookUseCase) CreateSavingBookOnline(ctx context.Context, input *p
 	}
 
 	entity.Regulations = append(entity.Regulations, *reg)
+	entity.PendingBalance = input.NewPaymentAmount
 	entity.Status = saving_book.SavingBookInit
 
 	entity.SetCreate(creatorId)
