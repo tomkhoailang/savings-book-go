@@ -14,6 +14,7 @@ type SavingBook struct {
 	Regulations       []Regulation       `bson:"Regulations" json:"regulations"`
 	Balance           float64            `bson:"Balance" json:"balance"`
 	PendingBalance    float64            `bson:"PendingBalance" json:"pendingBalance"`
+	PaymentUrl        string            `bson:"PaymentUrl" json:"paymentUrl"`
 	Status            string             `bson:"Status" json:"status"`
 	NextScheduleMonth time.Time          `bson:"NextScheduleMonth" json:"nextScheduleMonth"`
 }

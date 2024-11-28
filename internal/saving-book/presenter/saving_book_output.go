@@ -13,5 +13,6 @@ type SavingBookOutput struct {
 	Regulations    []Regulation       ` json:"regulations"`
 	Balance        float64            `bson:"Balance" json:"balance"`
 	PendingBalance float64            `bson:"PendingBalance" json:"pendingBalance"`
+	PaymentUrl        string            `bson:"PaymentUrl" json:"paymentUrl"`
 	Status         string             ` json:"status"`
 }

@@ -98,7 +98,7 @@ func (p *paymentUseCase) CreateOrder(ctx context.Context, orderRequest *paypal.I
 					Locale:                  "en-US",
 					ShippingPreference:      "NO_SHIPPING",
 					UserAction:              "PAY_NOW",
-					ReturnURL:               "https://example.com/returnUrl",
+					ReturnURL:               "http://localhost:3003/pages/savings-book?returnUrl",
 					CancelURL:               "https://example.com/cancelUrl",
 				},
 			},

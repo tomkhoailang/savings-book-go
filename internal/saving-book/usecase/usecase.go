@@ -93,7 +93,7 @@ func (s *savingBookUseCase) DepositOnline(ctx context.Context, input *presenter.
 	if err != nil {
 		return nil, err
 	}
-
+	savingBook.PaymentUrl = resp.Links[1].Href;
 	ticket := &domain.TransactionTicket{
 		SavingBookId:    savingBook.Id,
 		TransactionDate: time.Time{},
@@ -115,7 +115,7 @@ func (s *savingBookUseCase) DepositOnline(ctx context.Context, input *presenter.
 		if err = session.StartTransaction(); err != nil {
 			return err
 		}
-		_, err = s.savingBookRepo.Update(ctx, savingBook, savingBook.Id.Hex(), []string{"Regulations", "Status","PendingBalance"})
+		_, err = s.savingBookRepo.Update(ctx, savingBook, savingBook.Id.Hex(), []string{"Regulations", "Status","PendingBalance","PaymentUrl"})
 		if err != nil {
 			_ = session.AbortTransaction(sessionContext)
 			return err
@@ -332,7 +332,8 @@ func (s *savingBookUseCase) ConfirmPaymentOnline(ctx context.Context, paymentId,
 		nextMonth := time.Now().AddDate(0, 1, 1)
 		savingBook.Balance += ticket.PaymentAmount
 		savingBook.PendingBalance = 0
-		updateFields := []string{"Balance", "NextScheduleMonth", "PendingBalance"}
+		savingBook.PaymentUrl = ""
+		updateFields := []string{"Balance", "NextScheduleMonth", "PendingBalance","PaymentUrl"}
 
 		if savingBook.Status != saving_book.SavingBookActive {
 			updateFields = append(updateFields, "Status")
@@ -412,7 +413,6 @@ func (s *savingBookUseCase) CreateSavingBookOnline(ctx context.Context, input *p
 		return nil, err
 	}
 	entity.AccountId = objectId
-
 	resp, err := s.paymentUC.CreateOrder(ctx, &paypal.InitOrderRequest{
 		SavingBookId: entity.Id.Hex(),
 		Amount:       fmt.Sprintf("%.2f", input.NewPaymentAmount),
@@ -421,6 +421,7 @@ func (s *savingBookUseCase) CreateSavingBookOnline(ctx context.Context, input *p
 		return nil, err
 	}
 
+	entity.PaymentUrl = resp.Links[1].Href
 	session, err := s.ticketRepo.GetMongoClient().StartSession()
 	if err != nil {
 		return nil, err
