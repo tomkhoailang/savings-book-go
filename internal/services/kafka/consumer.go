@@ -24,7 +24,17 @@ func NewKafkaConsumer(broker string, groupId string, savingBookUC saving_book.Us
 }
 
 func (kc *KafkaConsumer) FetchTopics() ([]string, error) {
+
+	topicList := []string([]string{CaptureOrderTopic})
 	conn, err := kafka.Dial("tcp", kc.broker)
+
+	for _, topicName := range topicList  {
+		conn, err = kafka.DialLeader(context.Background(), "tcp", "localhost:9092", topicName, 0)
+		if err != nil {
+			panic(err.Error())
+		}
+	}
+
 	if err != nil {
 		return nil, err
 	}
@@ -38,6 +48,7 @@ func (kc *KafkaConsumer) FetchTopics() ([]string, error) {
 	for _, partition := range partitions {
 		topicSet[partition.Topic] = struct{}{}
 	}
+
 	topics := make([]string, 0, len(topicSet))
 	for topic := range topicSet {
 		topics = append(topics, topic)
