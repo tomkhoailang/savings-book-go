@@ -25,8 +25,8 @@ func NewScheduler(sv saving_book.SavingBookRepository, monthSavingInterestRepo m
 	return &Scheduler{savingBookRepo: sv, monthSavingInterestRepo: monthSavingInterestRepo, cron: cron.New(cron.WithSeconds())}
 }
 func (s *Scheduler) Start() {
-	_, err := s.cron.AddFunc("@midnight", s.handleSavingBook)
-	//_, err := s.cron.AddFunc("* * * * * * ", s.handleSavingBook)
+	//_, err := s.cron.AddFunc("@midnight", s.handleSavingBook)
+	_, err := s.cron.AddFunc("* * * * * * ", s.handleSavingBook)
 	if err != nil {
 		log.Println(err)
 		return
@@ -40,9 +40,9 @@ func (s *Scheduler) handleSavingBook() {
 	savingBookInterface := s.savingBookRepo.GetCollection()
 	savingBookCollection := savingBookInterface.(*mongo.Collection)
 
-	now := time.Now()
+	now := time.Now().Local()
 	//now := time.Date(2025, 6, 20, 0, 0, 0, 0, time.UTC)
-	filterDate := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+	filterDate := time.Date(now.Year(), now.Month(), now.Day(), now.Hour(), now.Minute(), now.Second(), 0, time.Local)
 
 	filter := bson.M{
 		"NextScheduleMonth": filterDate,
@@ -72,10 +72,11 @@ func (s *Scheduler) handleSavingBook() {
 		}
 		newestRegulation := savingBook.Regulations[len(savingBook.Regulations)-1]
 
-		monthRange := monthsBetween(newestRegulation.ApplyDate, now)
+		monthRange := minutesBetween(newestRegulation.ApplyDate, now)
 		interestRate := newestRegulation.InterestRate
 		updateDoc := bson.M{
-			"NextScheduleMonth": now.AddDate(0, 1, 0).Truncate(24 * time.Hour),
+			//"NextScheduleMonth": now.AddDate(0, 1, 0).Truncate(24 * time.Hour),
+			"NextScheduleMonth": time.Date(now.Year(), now.Month(), now.Day(), now.Hour(), now.Minute() + 1, now.Second(), 0, time.Local),
 		}
 
 		if monthRange >= newestRegulation.TermInMonth {
@@ -191,4 +192,8 @@ func monthsBetween(start, end time.Time) int {
 	monthDiff := int(end.Month()) - int(start.Month())
 
 	return yearDiff*12 + monthDiff
+}
+func minutesBetween(start, end time.Time) int {
+	duration := end.Sub(start)
+	return int(duration.Minutes())
 }

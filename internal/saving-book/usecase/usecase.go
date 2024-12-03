@@ -20,6 +20,7 @@ import (
 	kafka2 "SavingBooks/internal/services/kafka"
 	"SavingBooks/internal/services/kafka/event"
 	"SavingBooks/internal/services/redis"
+	"SavingBooks/internal/services/websocket"
 	transaction_ticket "SavingBooks/internal/transaction-ticket"
 	"SavingBooks/utils"
 	"github.com/jinzhu/copier"
@@ -34,6 +35,7 @@ type savingBookUseCase struct {
 	notificationUC notification.UseCase
 	kafkaProducer  *kafka2.KafkaProducer
 	cacheService *redis.Cache
+	socket *websocket.Hub
 }
 
 func (s *savingBookUseCase) DepositOnline(ctx context.Context, input *presenter.DepositInput, savingBookId, userId string) (*domain.TransactionTicket, error) {
@@ -155,8 +157,6 @@ func (s *savingBookUseCase) WithdrawOnline(ctx context.Context, input *presenter
 	lastReg := savingBook.Regulations[len(savingBook.Regulations)-1]
 	withDrawAmount := input.Amount
 
-
-
 	if lastReg.TermInMonth == 0 {
 		if savingBook.Balance < input.Amount {
 			return errors.New(saving_book.InsufficientBalance)
@@ -225,9 +225,11 @@ func (s *savingBookUseCase) WithdrawOnline(ctx context.Context, input *presenter
 
 	eventJson, err := json.Marshal(withDrawMessage)
 	err = s.kafkaProducer.SendMessage(kafka2.CaptureOrderTopic, eventJson)
+
 	if err != nil {
 		return err
 	}
+	s.socket.SendOne(websocket.SavingBookTransactionComplete,savingBook.AccountId.Hex(), savingBook)
 	return nil
 }
 
@@ -329,7 +331,8 @@ func (s *savingBookUseCase) ConfirmPaymentOnline(ctx context.Context, paymentId,
 		ticket.TransactionDate = time.Now()
 		ticket.SetSysUpdate()
 
-		nextMonth := time.Now().AddDate(0, 1, 1)
+		//nextMonth := time.Now().AddDate(0, 1, 1)
+		nextMonth := time.Now().Local()
 		savingBook.Balance += ticket.PaymentAmount
 		savingBook.PendingBalance = 0
 		savingBook.PaymentUrl = ""
@@ -348,7 +351,8 @@ func (s *savingBookUseCase) ConfirmPaymentOnline(ctx context.Context, paymentId,
 				lastReg.ApplyDate = time.Now()
 			}
 		}
-		savingBook.NextScheduleMonth = time.Date(nextMonth.Year(), nextMonth.Month(), nextMonth.Day(), 0, 0, 0, 0, time.UTC)
+		//savingBook.NextScheduleMonth = time.Date(nextMonth.Year(), nextMonth.Month(), nextMonth.Day(), 0, 0, 0, 0, time.UTC)
+		savingBook.NextScheduleMonth = time.Date(nextMonth.Year(), nextMonth.Month(), nextMonth.Day(), nextMonth.Hour(), nextMonth.Minute() +1, nextMonth.Second(), 0, time.Local)
 
 		_, err = s.savingBookRepo.Update(ctx, savingBook, savingBook.Id.Hex(), updateFields)
 
@@ -363,6 +367,7 @@ func (s *savingBookUseCase) ConfirmPaymentOnline(ctx context.Context, paymentId,
 		}
 		return session.CommitTransaction(ctx)
 	})
+	s.socket.SendOne(websocket.SavingBookTransactionComplete,savingBook.AccountId.Hex(), savingBook)
 	return nil
 }
 
@@ -505,6 +510,6 @@ func (s *savingBookUseCase) revertBalanceAndNotify(ctx context.Context, input *e
 	return nil
 }
 
-func NewSavingBookUseCase( savingBookRepo saving_book.SavingBookRepository, ticketRepo transaction_ticket.TransactionTicketRepository, paymentUC payment.PaymentUseCase, notificationUC notification.UseCase, kafkaProducer *kafka2.KafkaProducer, cacheService *redis.Cache) saving_book.UseCase {
-	return &savingBookUseCase{ savingBookRepo: savingBookRepo, ticketRepo: ticketRepo, paymentUC: paymentUC, notificationUC: notificationUC, kafkaProducer: kafkaProducer, cacheService: cacheService}
+func NewSavingBookUseCase( savingBookRepo saving_book.SavingBookRepository, ticketRepo transaction_ticket.TransactionTicketRepository, paymentUC payment.PaymentUseCase, notificationUC notification.UseCase, kafkaProducer *kafka2.KafkaProducer, cacheService *redis.Cache, socket *websocket.Hub) saving_book.UseCase {
+	return &savingBookUseCase{ savingBookRepo: savingBookRepo, ticketRepo: ticketRepo, paymentUC: paymentUC, notificationUC: notificationUC, kafkaProducer: kafkaProducer, cacheService: cacheService, socket: socket}
 }

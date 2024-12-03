@@ -9,5 +9,6 @@ type ClientMessage struct {
 	Message  []byte
 }
 const (
-	WithDrawStatus = "WithDrawStatus"
+	WithDrawStatus                = "WithDrawStatus"
+	SavingBookTransactionComplete = "SavingBookTransactionComplete"
 )

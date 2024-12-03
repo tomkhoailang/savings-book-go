@@ -78,7 +78,7 @@ func (s *Server) MapHandlers(g *gin.Engine) (saving_book.UseCase, saving_book.Sa
 	paymentUC := paymentUC.NewPaymentUseCase(s.cfg.ClientId, s.cfg.ClientSecret)
 	regulationUC := regulationUC.NewSavingRegulationUseCase(regulationRepo, cacheService)
 	notificationUC := notificationUC.NewNotificationUseCase(notificationRepo, s.hub)
-	savingBookUC := savingBookUC.NewSavingBookUseCase(savingBookRepo,ticketRepo, paymentUC,notificationUC, kafkaProducer, cacheService)
+	savingBookUC := savingBookUC.NewSavingBookUseCase(savingBookRepo,ticketRepo, paymentUC,notificationUC, kafkaProducer, cacheService, s.hub)
 	ticketUC := ticketUc.NewTransactionTicketUseCase(ticketRepo, savingBookRepo)
 	monthlyUC := monthlyUC.NewMonthlyUC(monthlyRepo)
 
