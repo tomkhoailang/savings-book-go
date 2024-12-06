@@ -46,6 +46,7 @@ func (s *Scheduler) handleSavingBook() {
 	filter := bson.M{
 		"NextScheduleMonth": filterDate,
 		"Balance":           bson.M{"$gt": 0},
+		"Status":            bson.M{"$ne": "closed"},
 	}
 
 	cursor, err := savingBookCollection.Find(context.Background(), filter)
@@ -75,13 +76,13 @@ func (s *Scheduler) handleSavingBook() {
 		interestRate := newestRegulation.InterestRate
 		updateDoc := bson.M{
 			//"NextScheduleMonth": now.AddDate(0, 1, 0).Truncate(24 * time.Hour),
-			"NextScheduleMonth": time.Date(now.Year(), now.Month(), now.Day(), now.Hour(), now.Minute() + 1, now.Second(), 0, time.Local),
+			"NextScheduleMonth": time.Date(now.Year(), now.Month(), now.Day(), now.Hour(), now.Minute()+1, now.Second(), 0, time.Local),
 		}
 
 		if monthRange >= newestRegulation.TermInMonth {
 			if savingBook.Status != saving_book.SavingBookExpired {
 				updateDoc["Status"] = saving_book.SavingBookExpired
-			}else {
+			} else {
 				interestRate = newestRegulation.NoTermInterestRate
 			}
 		}
@@ -93,7 +94,6 @@ func (s *Scheduler) handleSavingBook() {
 			SetFilter(bson.M{"_id": savingBook.Id}).
 			SetUpdate(bson.M{"$set": updateDoc})
 		savingOperations = append(savingOperations, savingBookUpdate)
-
 
 		monthlyAmount := ((newBalance - savingBook.Balance) * 100) / 100
 

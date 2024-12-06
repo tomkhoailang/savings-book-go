@@ -134,7 +134,7 @@ func (s *savingBookUseCase) DepositOnline(ctx context.Context, input *presenter.
 	if err != nil {
 		return nil, err
 	}
-
+	s.socket.SendOne(websocket.SavingBookTransactionComplete,savingBook.AccountId.Hex(), savingBook)
 	return ticket, nil
 }
 
@@ -195,7 +195,7 @@ func (s *savingBookUseCase) WithdrawOnline(ctx context.Context, input *presenter
 	savingBook.Balance -= withDrawAmount
 	if savingBook.Balance == 0 {
 		updatedSavingBookField = append(updatedSavingBookField, "Status")
-		savingBook.Status = saving_book.SavingBookExpired
+		savingBook.Status = saving_book.SavingBookClosed
 	}
 
 	ticket := &domain.TransactionTicket{
@@ -511,7 +511,8 @@ func (s *savingBookUseCase) revertBalanceAndNotify(ctx context.Context, input *e
 	}
 
 	savingBook.Balance += input.Amount
-	if _, err := s.savingBookRepo.Update(ctx, savingBook, savingBook.Id.Hex(), []string{"Balance"}); err != nil {
+	savingBook.Status = saving_book.SavingBookActive
+	if _, err := s.savingBookRepo.Update(ctx, savingBook, savingBook.Id.Hex(), []string{"Balance","Status"}); err != nil {
 		return fmt.Errorf("failed to revert saving book balance: %w", err)
 	}
 

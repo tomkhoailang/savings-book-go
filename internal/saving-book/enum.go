@@ -3,6 +3,7 @@
 var (
 	SavingBookActive  = "active"
 	SavingBookExpired = "expired"
+	SavingBookClosed = "closed"
 	SavingBookInit    = "init"
 )
 
