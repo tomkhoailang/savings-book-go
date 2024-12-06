@@ -3,7 +3,7 @@
 import "encoding/json"
 
 type Hub struct {
-	clients    map[string]*Client
+	clients    map[string]map[string]*Client
 	broadcast  chan []byte
 	notify     chan ClientMessage
 	register   chan *Client
@@ -12,7 +12,7 @@ type Hub struct {
 
 func NewHub() *Hub {
 	return &Hub{
-		clients:    make(map[string]*Client),
+		clients:    make(map[string]map[string]*Client),
 		broadcast:  make(chan []byte),
 		register:   make(chan *Client),
 		unregister: make(chan *Client),
@@ -23,27 +23,34 @@ func (h *Hub) Run() {
 	for {
 		select {
 		case client := <-h.register:
-			h.clients[client.userId] = client
+			if h.clients[client.userId] == nil {
+				h.clients[client.userId] = make(map[string]*Client)
+			}
+			h.clients[client.userId][client.tabId] = client
 		case client := <-h.unregister:
 			if _, ok := h.clients[client.userId]; ok {
 				delete(h.clients, client.userId)
 			}
 		case broadcastMessage := <-h.broadcast:
-			for _, client := range h.clients {
-				select {
-				case client.send <- broadcastMessage:
-				default:
-					close(client.send)
-					delete(h.clients, client.userId)
+			for _, userClients := range h.clients {
+				for _, client := range userClients {
+					select {
+					case client.send <- broadcastMessage:
+					default:
+						close(client.send)
+						delete(h.clients, client.userId)
+					}
 				}
 			}
 		case clientMessage := <-h.notify:
-			if client, ok := h.clients[clientMessage.ClientID]; ok {
-				select {
-				case client.send <- clientMessage.Message:
-				default:
-					close(client.send)
-					delete(h.clients, client.userId)
+			if clients, ok := h.clients[clientMessage.ClientID]; ok {
+				for _, client := range clients {
+					select {
+					case client.send <- clientMessage.Message:
+					default:
+						close(client.send)
+						delete(h.clients, client.userId)
+					}
 				}
 			}
 

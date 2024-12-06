@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"log"
-	"math"
 	"time"
 
 	"SavingBooks/internal/domain"
@@ -87,7 +86,6 @@ func (s *Scheduler) handleSavingBook() {
 			}
 		}
 		newBalance := savingBook.Balance * (1 + (interestRate / 100))
-		newBalance = math.Ceil(newBalance * 100) / 100
 
 		updateDoc["Balance"] = newBalance
 
@@ -97,7 +95,7 @@ func (s *Scheduler) handleSavingBook() {
 		savingOperations = append(savingOperations, savingBookUpdate)
 
 
-		monthlyAmount := math.Ceil((newBalance - savingBook.Balance) * 100) / 100
+		monthlyAmount := ((newBalance - savingBook.Balance) * 100) / 100
 
 		monthlyInterest := domain.MonthlySavingInterest{
 			SavingBookId: savingBook.Id,

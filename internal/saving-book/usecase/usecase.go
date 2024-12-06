@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"math"
 	"time"
 
 	presenter3 "SavingBooks/internal/auth/presenter"
@@ -137,6 +138,10 @@ func (s *savingBookUseCase) DepositOnline(ctx context.Context, input *presenter.
 	return ticket, nil
 }
 
+func secondBetween(start, end time.Time) int {
+	duration := end.Sub(start)
+	return int(duration.Seconds())
+}
 func (s *savingBookUseCase) WithdrawOnline(ctx context.Context, input *presenter.WithDrawInput, savingBookId, userId string) error {
 
 	if !utils.ValidateTwoDecimalPlaces(input.Amount) {
@@ -153,11 +158,20 @@ func (s *savingBookUseCase) WithdrawOnline(ctx context.Context, input *presenter
 	if savingBook.Balance < input.Amount {
 		return errors.New(saving_book.InsufficientBalance)
 	}
-
-	lastReg := savingBook.Regulations[len(savingBook.Regulations)-1]
+	var lastReg domain.Regulation
+	for i := len(savingBook.Regulations) - 1; i >= 0; i-- {
+		if(savingBook.Regulations[i].ApplyDate != time.Time{}) {
+			lastReg = savingBook.Regulations[i]
+		}
+	}
 	withDrawAmount := input.Amount
 
-	if lastReg.TermInMonth == 0 {
+	secondDiff := secondBetween(lastReg.ApplyDate,time.Now().Local())
+
+	if lastReg.TermInMonth == 0  {
+		if secondDiff < lastReg.MinWithDrawDay {
+			return errors.New(saving_book.MinWithdrawDayError)
+		}
 		if savingBook.Balance < input.Amount {
 			return errors.New(saving_book.InsufficientBalance)
 		}
@@ -166,8 +180,12 @@ func (s *savingBookUseCase) WithdrawOnline(ctx context.Context, input *presenter
 		}
 		withDrawAmount = input.Amount
 
-	}else if savingBook.Status != saving_book.SavingBookExpired {
-		return errors.New(saving_book.CannotWithdrawError)
+	}else  {
+		if savingBook.Status != saving_book.SavingBookExpired {
+			return errors.New(saving_book.CannotWithdrawError)
+		}
+
+		withDrawAmount = math.Floor(savingBook.Balance*100)/100
 	}
 
 	if savingBook.Regulations[len(savingBook.Regulations)-1].MinWithDrawValue > withDrawAmount {

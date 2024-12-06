@@ -96,6 +96,7 @@ func (kc *KafkaConsumer) listenToTopic(topic string) {
 				log.Printf("Error unmarshaling message from topic %s: %v\n", topic, err)
 				continue
 			}
+			log.Printf("handle event now")
 			err = kc.SavingBookUC.HandleWithdraw(context.Background(), &withDrawEvent)
 			if err != nil {
 				log.Printf("Error handling withdraw: %v\n", err)

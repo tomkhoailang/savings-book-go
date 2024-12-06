@@ -37,6 +37,7 @@ type Client struct {
 	hub *Hub
 	conn *websocket.Conn
 	userId string
+	tabId string
 	send chan []byte
 }
 
@@ -83,12 +84,16 @@ func ServeWs(hub *Hub, c *gin.Context)  {
 	if err != nil {
 		return
 	}
+	tabId := c.Query("tabId")
+	if tabId == "" {
+		return
+	}
 	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
 		log.Println(err)
 		return
 	}
-	client := &Client{hub: hub, conn: conn, send: make(chan []byte, 256), userId: userId}
+	client := &Client{hub: hub, conn: conn, send: make(chan []byte, 256), userId: userId, tabId: tabId}
 	client.hub.register <- client
 
 	go client.writePump()
