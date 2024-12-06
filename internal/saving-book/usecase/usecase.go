@@ -52,7 +52,14 @@ func (s *savingBookUseCase) DepositOnline(ctx context.Context, input *presenter.
 	if savingBook.CreatorId.Hex() != userId {
 		return nil, errors.New(saving_book.NotSavingBookOwnerError)
 	}
-	if savingBook.Status != saving_book.SavingBookExpired {
+	var lastReg domain.Regulation
+	for i := len(savingBook.Regulations) - 1; i >= 0; i-- {
+		if(savingBook.Regulations[i].ApplyDate != time.Time{}) {
+			lastReg = savingBook.Regulations[i]
+		}
+	}
+
+	if savingBook.Status != saving_book.SavingBookExpired || lastReg.TermInMonth !=0 {
 		return nil, errors.New(saving_book.CannotDepositError)
 	}
 
