@@ -15,10 +15,10 @@ import (
 	"SavingBooks/internal/services/cron"
 	"SavingBooks/internal/services/kafka"
 	"SavingBooks/internal/services/websocket"
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/mongo"
-	"github.com/gin-contrib/cors"
 )
 
 type Server struct {
@@ -59,11 +59,11 @@ func (s *Server) Run() error {
 		},
 	}
 	s.hub = websocket.NewHub()
-	savingBookUC,savingBookRepo,monthlyRepo, err := s.MapHandlers(s.gin);
+	savingBookUC,savingBookRepo,monthlyRepo, ticketRepo, err := s.MapHandlers(s.gin);
 	if err != nil {
 		return  err
 	}
-	s.scheduler = cron.NewScheduler(savingBookRepo, monthlyRepo)
+	s.scheduler = cron.NewScheduler(savingBookRepo, monthlyRepo, ticketRepo)
 
 
 

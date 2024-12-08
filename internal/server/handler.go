@@ -12,6 +12,7 @@ import (
 	kafka2 "SavingBooks/internal/services/kafka"
 	"SavingBooks/internal/services/redis"
 	"SavingBooks/internal/services/websocket"
+	transaction_ticket "SavingBooks/internal/transaction-ticket"
 	"github.com/gin-gonic/gin"
 
 	authHttp "SavingBooks/internal/auth/delivery/http"
@@ -52,7 +53,7 @@ import (
 
 )
 
-func (s *Server) MapHandlers(g *gin.Engine) (saving_book.UseCase, saving_book.SavingBookRepository, monthly_saving_interest.Repository, error) {
+func (s *Server) MapHandlers(g *gin.Engine) (saving_book.UseCase, saving_book.SavingBookRepository, monthly_saving_interest.Repository,  transaction_ticket.TransactionTicketRepository , error) {
 	db := s.db.Database(s.cfg.DatabaseName)
 
 
@@ -129,9 +130,9 @@ func (s *Server) MapHandlers(g *gin.Engine) (saving_book.UseCase, saving_book.Sa
 	ctx := context.Background()
 	if err := roleRepo.SeedRole(ctx); err != nil {
 		fmt.Println("Something wrong with seed roles")
-		return savingBookUC,savingBookRepo, monthlyRepo,err
+		return savingBookUC,savingBookRepo, monthlyRepo,ticketRepo,err
 	}
 
 
-	return savingBookUC,savingBookRepo, monthlyRepo, nil
+	return savingBookUC,savingBookRepo, monthlyRepo,ticketRepo, nil
 }

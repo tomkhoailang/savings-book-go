@@ -9,6 +9,7 @@ import (
 	"SavingBooks/internal/domain"
 	monthly_saving_interest "SavingBooks/internal/monthly-saving-interest"
 	saving_book "SavingBooks/internal/saving-book"
+	transaction_ticket "SavingBooks/internal/transaction-ticket"
 	"github.com/robfig/cron/v3"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -17,11 +18,12 @@ import (
 type Scheduler struct {
 	savingBookRepo          saving_book.SavingBookRepository
 	monthSavingInterestRepo monthly_saving_interest.Repository
+	ticketRepo transaction_ticket.TransactionTicketRepository
 	cron                    *cron.Cron
 }
 
-func NewScheduler(sv saving_book.SavingBookRepository, monthSavingInterestRepo monthly_saving_interest.Repository) *Scheduler {
-	return &Scheduler{savingBookRepo: sv, monthSavingInterestRepo: monthSavingInterestRepo, cron: cron.New(cron.WithSeconds())}
+func NewScheduler(sv saving_book.SavingBookRepository, monthSavingInterestRepo monthly_saving_interest.Repository,ticketRepo transaction_ticket.TransactionTicketRepository) *Scheduler {
+	return &Scheduler{savingBookRepo: sv, monthSavingInterestRepo: monthSavingInterestRepo, ticketRepo: ticketRepo,cron: cron.New(cron.WithSeconds())}
 }
 func (s *Scheduler) Start() {
 	//_, err := s.cron.AddFunc("@midnight", s.handleSavingBook)
@@ -30,10 +32,111 @@ func (s *Scheduler) Start() {
 		log.Println(err)
 		return
 	}
+	_, err = s.cron.AddFunc("0 * * * * *", s.handleTransactionTicket)
+	if err != nil {
+		log.Println(err)
+		return
+	}
 	s.cron.Start()
 }
 func (s *Scheduler) Stop() {
 	s.cron.Stop()
+}
+func (s *Scheduler) handleTransactionTicket() {
+	ticketInterface := s.ticketRepo.GetCollection()
+	ticketRepo := ticketInterface.(*mongo.Collection)
+
+	now := time.Now().Local()
+	expireThreshold := now.Add(-30 * time.Minute)
+
+
+	pipeline := []bson.M{
+		{
+			"$match": bson.M{
+				"CreationTime": bson.M{
+					"$lte": expireThreshold,
+				},
+				"Status":             transaction_ticket.TransactionStatusPending,
+			},
+		},
+		{
+			"$lookup": bson.M{
+				"from":         "SavingBook",
+				"localField":   "SavingBookId",
+				"foreignField": "_id",
+				"as":           "saving_book",
+			},
+		},
+	}
+
+	cursor, err := ticketRepo.Aggregate(context.Background(), pipeline)
+
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	defer cursor.Close(context.Background())
+	var ticketOperations []mongo.WriteModel
+	var savingOperations []mongo.WriteModel
+	batchSize := 50
+
+	for cursor.Next(context.Background()) {
+		var result struct {
+			TransactionTicket domain.TransactionTicket `bson:",inline"`
+			SavingBookDetails []domain.SavingBook      `bson:"saving_book"`
+		}
+
+		if err := cursor.Decode(&result); err != nil {
+			log.Println("Error decoding saving book:", err)
+			continue
+		}
+		if len(result.SavingBookDetails) != 1 {
+			log.Println("Unexpected SavingBookDetails size:", len(result.SavingBookDetails))
+			continue
+		}
+		savingBook := result.SavingBookDetails[0]
+		ticket := result.TransactionTicket
+
+		updateTicketDoc := bson.M{
+			"Status": transaction_ticket.TransactionStatusAbort,
+		}
+		ticketUpdate := mongo.NewUpdateOneModel().
+			SetFilter(bson.M{"_id": ticket.Id,"Status": transaction_ticket.TransactionStatusPending, }).
+			SetUpdate(bson.M{"$set": updateTicketDoc})
+
+		updateSavingBookDoc := bson.M{
+			"PendingBalance": 0,
+			"PaymentUrl": "",
+		}
+		savingUpdate := mongo.NewUpdateOneModel().
+			SetFilter(bson.M{"_id": savingBook.Id, "PendingBalance": bson.M{"$gt": 0}}).
+			SetUpdate(bson.M{"$set": updateSavingBookDoc})
+
+		ticketOperations = append(ticketOperations, ticketUpdate)
+		savingOperations = append(savingOperations, savingUpdate)
+
+
+		if len(ticketOperations) == batchSize {
+			err := bulkWriteForCleanUpTicket(s.ticketRepo, s.savingBookRepo, ticketOperations, savingOperations)
+			if err != nil {
+				log.Println("error after maximum retry:", err)
+				return
+			}
+			ticketOperations = ticketOperations[:0]
+		}
+	}
+	if len(ticketOperations) > 0 {
+		err := bulkWriteForCleanUpTicket(s.ticketRepo, s.savingBookRepo, ticketOperations, savingOperations)
+		if err != nil {
+			log.Println("error after maximum retry:", err)
+			return
+		}
+	}
+
+	if err = cursor.Err(); err != nil {
+		log.Println("Error iterating cursor:", err)
+	}
+
 }
 func (s *Scheduler) handleSavingBook() {
 	savingBookInterface := s.savingBookRepo.GetCollection()
@@ -126,6 +229,52 @@ func (s *Scheduler) handleSavingBook() {
 	if err = cursor.Err(); err != nil {
 		log.Println("Error iterating cursor:", err)
 	}
+
+}
+func bulkWriteForCleanUpTicket(ticketRepo transaction_ticket.TransactionTicketRepository, savingBookRepo saving_book.SavingBookRepository, writeTicket, writeSaving []mongo.WriteModel) error {
+
+	return retry(5, 10*time.Second, func() error {
+		savingBookInterface := savingBookRepo.GetCollection()
+		savingBookCollection := savingBookInterface.(*mongo.Collection)
+
+		ticketInterface := ticketRepo.GetCollection()
+		ticketCollection := ticketInterface.(*mongo.Collection)
+
+		session, err := ticketRepo.GetMongoClient().StartSession()
+		if err != nil {
+			log.Println("error starting mongo session:", err)
+			return errors.New("error starting mongo session")
+		}
+
+		defer session.EndSession(context.Background())
+		err = mongo.WithSession(context.Background(), session, func(sessionContext mongo.SessionContext) error {
+			if err = session.StartTransaction(); err != nil {
+				return err
+			}
+			_, err = savingBookCollection.BulkWrite(sessionContext, writeSaving)
+			if err != nil {
+				log.Println("Error in BulkWrite:", err)
+			}
+			if err != nil {
+				_ = session.AbortTransaction(sessionContext)
+				return err
+			}
+			_, err = ticketCollection.BulkWrite(sessionContext, writeTicket)
+			if err != nil {
+				log.Println("Error in BulkWrite:", err)
+			}
+			if err != nil {
+				_ = session.AbortTransaction(sessionContext)
+				return err
+			}
+			return session.CommitTransaction(sessionContext)
+		})
+		if err != nil {
+			log.Println("bulk write from cron failed", err)
+			return errors.New("bulk write from cron failed")
+		}
+		return nil
+	})
 
 }
 func bulkWrite(monthlyRepo monthly_saving_interest.Repository, savingBookRepo saving_book.SavingBookRepository, writeSavingBook, writeMonthly []mongo.WriteModel) error {

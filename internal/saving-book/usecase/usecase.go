@@ -332,7 +332,7 @@ func (s *savingBookUseCase) ConfirmPaymentOnline(ctx context.Context, paymentId,
 		return err
 	}
 
-	if ticket.Status != transaction_ticket.TransactionStatusPending {
+	if ticket.Status != transaction_ticket.TransactionStatusPending  && ticket.Status != transaction_ticket.TransactionStatusAbort{
 		return errors.New(saving_book.TransactionTicketNotPendingStatus)
 	}
 
