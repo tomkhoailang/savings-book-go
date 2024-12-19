@@ -45,6 +45,7 @@ import (
 	notificationRepo "SavingBooks/internal/notification/repository"
 	notificationUC "SavingBooks/internal/notification/usecase"
 
+	monthlyHttp "SavingBooks/internal/monthly-saving-interest/delivery/http"
 	monthlyRepo "SavingBooks/internal/monthly-saving-interest/repository"
 	monthlyUC "SavingBooks/internal/monthly-saving-interest/usecase"
 
@@ -93,6 +94,7 @@ func (s *Server) MapHandlers(g *gin.Engine) (saving_book.UseCase, saving_book.Sa
 	savingBookHandler := savingBookHttp.NewSavingBookHandler(savingBookUC, ticketUC, monthlyUC)
 	ticketHandler := ticketHttp.NewTransactionTicketHandler(ticketUC)
 	notificationHandler := notificationHttp.NewNotificationHandler(notificationUC)
+	monthlyHandler := monthlyHttp.NewMonthlyInterestHandler(monthlyUC)
 
 
 
@@ -107,6 +109,7 @@ func (s *Server) MapHandlers(g *gin.Engine) (saving_book.UseCase, saving_book.Sa
 	savingBookGroup := v1.Group("/saving-book")
 	ticketGroup := v1.Group("/transaction-ticket")
 	notificationGroup := v1.Group("/notification")
+	monthlyGroup := v1.Group("/monthly-saving-interest")
 
 	socketGroup := v1.Group("/ws")
 
@@ -123,6 +126,7 @@ func (s *Server) MapHandlers(g *gin.Engine) (saving_book.UseCase, saving_book.Sa
 	savingBookHttp.MapAuthRoutes(savingBookGroup, savingBookHandler, mw)
 	ticketHttp.MapAuthRoutes(ticketGroup, ticketHandler, mw)
 	notificationHttp.MapAuthRoutes(notificationGroup, notificationHandler, mw)
+	monthlyHttp.MapAuthRoutes(monthlyGroup, monthlyHandler, mw)
 
 	websocket.MapAuthRoutes(socketGroup, s.hub, mw)
 

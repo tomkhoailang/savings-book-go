@@ -49,10 +49,6 @@ func (t *transactionTicketHandler) GetTicketsOfSavingBook() gin.HandlerFunc {
 			return
 		}
 		c.JSON(http.StatusOK, output)
-
-
-
-
 	}
 }
 func NewTransactionTicketHandler(ticketUC transaction_ticket.UseCase) transaction_ticket.Handler {
