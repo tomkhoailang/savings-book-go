@@ -13,6 +13,7 @@ import (
 	"SavingBooks/internal/contracts"
 	"SavingBooks/internal/contracts/paypal"
 	"SavingBooks/internal/domain"
+	monthly_saving_interest "SavingBooks/internal/monthly-saving-interest"
 	"SavingBooks/internal/notification"
 	presenter2 "SavingBooks/internal/notification/presenter"
 	"SavingBooks/internal/payment"
@@ -34,6 +35,7 @@ type savingBookUseCase struct {
 	ticketRepo     transaction_ticket.TransactionTicketRepository
 	paymentUC      payment.PaymentUseCase
 	notificationUC notification.UseCase
+	monthlyUC monthly_saving_interest.UseCase
 	kafkaProducer  *kafka2.KafkaProducer
 	cacheService *redis.Cache
 	socket *websocket.Hub
@@ -493,7 +495,7 @@ func (s *savingBookUseCase) CreateSavingBookOnline(ctx context.Context, input *p
 	return entity, nil
 }
 
-func (s *savingBookUseCase) GetListSavingBook(ctx context.Context, query *contracts.Query, auth *presenter3.AuthData) (*contracts.QueryResult[domain.SavingBook], error) {
+func (s *savingBookUseCase) GetListSavingBook(ctx context.Context, query *contracts.Query, auth *presenter3.AuthData) (*contracts.QueryResult[presenter.SavingBookOutput], error) {
 	var savingBookInterfaces interface{}
 	var err error
 
@@ -507,8 +509,31 @@ func (s *savingBookUseCase) GetListSavingBook(ctx context.Context, query *contra
 		return nil, err
 	}
 	savingBooks := savingBookInterfaces.(*contracts.QueryResult[domain.SavingBook])
+	savingBooksOutput := &contracts.QueryResult[presenter.SavingBookOutput]{}
+	err = copier.Copy(&savingBooksOutput, savingBooks)
+	if err != nil {
+		return nil, err
+	}
 
-	return savingBooks, nil
+	var savingBookIds []string
+	for _, savingBook := range savingBooksOutput.Items {
+		savingBookIds = append(savingBookIds, savingBook.Id.Hex())
+	}
+	totalEarningsMap, err := s.monthlyUC.GetTotalEarningsOfSavingBooks(ctx, savingBookIds)
+	if err != nil {
+		return nil, err
+	}
+	for i := range savingBooksOutput.Items {
+		savingBook := &savingBooksOutput.Items[i]
+		if totalEarnings, exists := totalEarningsMap[savingBook.Id.Hex()]; exists {
+			savingBook.TotalEarnings = totalEarnings
+		} else {
+			savingBook.TotalEarnings = 0
+		}
+	}
+
+
+	return savingBooksOutput, nil
 }
 
 func (s *savingBookUseCase) revertBalanceAndNotify(ctx context.Context, input *event.WithDrawEvent, ticket *domain.TransactionTicket) error {
@@ -536,6 +561,6 @@ func (s *savingBookUseCase) revertBalanceAndNotify(ctx context.Context, input *e
 	return nil
 }
 
-func NewSavingBookUseCase( savingBookRepo saving_book.SavingBookRepository, ticketRepo transaction_ticket.TransactionTicketRepository, paymentUC payment.PaymentUseCase, notificationUC notification.UseCase, kafkaProducer *kafka2.KafkaProducer, cacheService *redis.Cache, socket *websocket.Hub) saving_book.UseCase {
-	return &savingBookUseCase{ savingBookRepo: savingBookRepo, ticketRepo: ticketRepo, paymentUC: paymentUC, notificationUC: notificationUC, kafkaProducer: kafkaProducer, cacheService: cacheService, socket: socket}
+func NewSavingBookUseCase( savingBookRepo saving_book.SavingBookRepository, ticketRepo transaction_ticket.TransactionTicketRepository, paymentUC payment.PaymentUseCase, notificationUC notification.UseCase, monthlyUC monthly_saving_interest.UseCase,  kafkaProducer *kafka2.KafkaProducer, cacheService *redis.Cache, socket *websocket.Hub) saving_book.UseCase {
+	return &savingBookUseCase{ savingBookRepo: savingBookRepo, ticketRepo: ticketRepo, paymentUC: paymentUC, notificationUC: notificationUC, kafkaProducer: kafkaProducer, cacheService: cacheService, socket: socket, monthlyUC: monthlyUC}
 }

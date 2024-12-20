@@ -14,6 +14,7 @@ type SavingBookOutput struct {
 	IdCardNumber      string             ` json:"idCardNumber"`
 	Regulations       []Regulation       ` json:"regulations"`
 	Balance           float64            `bson:"Balance" json:"balance"`
+	TotalEarnings           float64            `bson:"TotalEarnings" json:"totalEarnings"`
 	PendingBalance    float64            `bson:"PendingBalance" json:"pendingBalance"`
 	NextScheduleMonth time.Time          `bson:"NextScheduleMonth" json:"nextScheduleMonth"`
 	PaymentUrl        string             `bson:"PaymentUrl" json:"paymentUrl"`

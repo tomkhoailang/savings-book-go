@@ -25,7 +25,7 @@ type savingBookHandler struct {
 }
 
 func (s *savingBookHandler) GetListSavingBook() gin.HandlerFunc {
-	return utils.HandleGetListRequestAuth[domain.SavingBook](s.savingBookUC.GetListSavingBook)
+	return utils.HandleGetListRequestAuth[presenter.SavingBookOutput](s.savingBookUC.GetListSavingBook)
 }
 
 func (s *savingBookHandler) GetTicketsOfSavingBook() gin.HandlerFunc {

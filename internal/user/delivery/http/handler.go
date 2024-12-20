@@ -1,7 +1,6 @@
 ﻿package http
 
 import (
-	"SavingBooks/internal/domain"
 	"SavingBooks/internal/user"
 	"SavingBooks/internal/user/presenter"
 	"SavingBooks/utils"
@@ -14,7 +13,7 @@ type userHandler struct {
 }
 
 func (u *userHandler) GetListUser() gin.HandlerFunc {
-	return utils.NewHandleGetListRequest[domain.User, presenter.User](u.userUC.GetListUser)
+	return utils.NewHandleGetListRequestNew[presenter.User](u.userUC.GetListUser)
 }
 
 func (u *userHandler) DisableUser() gin.HandlerFunc {

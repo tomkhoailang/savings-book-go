@@ -75,14 +75,14 @@ func (s *Server) MapHandlers(g *gin.Engine) (saving_book.UseCase, saving_book.Sa
 
 	testUC := testUC.NewTestServiceUseCase(kafkaProducer, s.hub)
 	authUC := authUC.NewAuthUseCase(userRepo, roleRepo,emailService,cacheService, s.cfg.HashSalt, []byte(s.cfg.JwtSecret), s.cfg.TokenDuration, s.cfg.RefreshTokenDuration)
-	userUc := userUC.NewUserUseCase(userRepo, cacheService, time.Duration(s.cfg.TokenDuration))
+	userUc := userUC.NewUserUseCase(userRepo, monthlyRepo, cacheService, time.Duration(s.cfg.TokenDuration))
 	roleUc := roleUC.NewRoleUseCase(roleRepo)
 	paymentUC := paymentUC.NewPaymentUseCase(s.cfg.ClientId, s.cfg.ClientSecret)
 	regulationUC := regulationUC.NewSavingRegulationUseCase(regulationRepo, cacheService)
 	notificationUC := notificationUC.NewNotificationUseCase(notificationRepo, s.hub)
-	savingBookUC := savingBookUC.NewSavingBookUseCase(savingBookRepo,ticketRepo, paymentUC,notificationUC, kafkaProducer, cacheService, s.hub)
 	ticketUC := ticketUc.NewTransactionTicketUseCase(ticketRepo, savingBookRepo)
-	monthlyUC := monthlyUC.NewMonthlyUC(monthlyRepo)
+	monthlyUC := monthlyUC.NewMonthlyUC(monthlyRepo, savingBookRepo)
+	savingBookUC := savingBookUC.NewSavingBookUseCase(savingBookRepo,ticketRepo, paymentUC,notificationUC,monthlyUC, kafkaProducer, cacheService, s.hub)
 
 
 	testHandler := testHttp.NewTestServiceHandler(testUC)
