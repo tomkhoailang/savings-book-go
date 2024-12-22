@@ -2,6 +2,7 @@
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"SavingBooks/internal/auth"
@@ -46,16 +47,38 @@ func (u *userUseCase) DisableUser(ctx context.Context, userId string) error {
 	if err != nil {
 		return err
 	}
+	roles := ctx.Value("roles").(map[string]interface{})
+	isAdmin := false
+	for key, _ := range roles {
+		if key == "Admin" {
+			isAdmin = false
+			break
+		}
+	}
+
+	if isAdmin {
+		return errors.New("Admin can't be blocked")
+	}
+
+
 	user.IsActive = !user.IsActive
+	if !user.IsActive{
+		err = u.cacheService.SetValueWithExpire(ctx, redis_key.BlockUserId+":"+userId, user.Id, 5 * time.Minute)
+		if err != nil {
+			return err
+		}
+	}else {
+		err := u.cacheService.RemoveValue(ctx, redis_key.BlockUserId+":"+userId)
+		if err != nil {
+			return err
+		}
+	}
 	user.RefreshToken = ""
 	_, err = u.userRepo.Update(ctx, user, userId, []string{"IsActive", "RefreshToken"})
 	if err != nil {
 		return err
 	}
-	err = u.cacheService.SetValueWithExpire(ctx, redis_key.BlockUserId+":"+userId, user.Id, u.expireTime)
-	if err != nil {
-		return err
-	}
+
 	return nil
 }
 

@@ -7,6 +7,6 @@ import (
 )
 
 func MapAuthRoutes(authGroup *gin.RouterGroup, t monthly_saving_interest.Handler, mw *middleware.MiddleWareManager) {
-	authGroup.Use(mw.JWTValidation(), mw.RoleValidation([]string{"Admin"}))
+	authGroup.Use(mw.JWTValidation())
 	authGroup.GET("", t.GetListMonthlyInterest())
 }

@@ -15,7 +15,7 @@ func MapAuthRoutes(authGroup *gin.RouterGroup,s saving_book.Handler, mw *middlew
 	authGroup.POST("/:id/deposit-online",s.DepositOnline())
 	authGroup.GET("/:id/transaction-ticket",s.GetTicketsOfSavingBook())
 	authGroup.GET("/:id/monthly-interest",s.GetMonthlyInterestOfSavingBook())
-	authGroup.GET("/dashboard-day-stats",s.GetDailyRevenueReport())
-	authGroup.GET("/dashboard-month-stats",s.GetMonthlyReport())
+	authGroup.GET("/dashboard-day-stats",mw.RoleValidation([]string {"Admin"}),s.GetDailyRevenueReport())
+	authGroup.GET("/dashboard-month-stats",mw.RoleValidation([]string {"Admin"}), s.GetMonthlyReport())
 
 }
