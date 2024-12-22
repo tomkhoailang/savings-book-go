@@ -2,6 +2,7 @@
 
 import (
 	"context"
+	"time"
 
 	presenter2 "SavingBooks/internal/auth/presenter"
 	"SavingBooks/internal/contracts"
@@ -17,5 +18,8 @@ type UseCase interface {
 	WithdrawOnline(ctx context.Context, input *presenter.WithDrawInput, savingBookId, userId string) error
 	DepositOnline(ctx context.Context, input *presenter.DepositInput, savingBookId, userId string)  (*domain.TransactionTicket, error)
 	HandleWithdraw(ctx context.Context, input *event.WithDrawEvent) error
+
+	GetDashboardDayStats(ctx context.Context, input time.Time) ([]presenter.DashboardDayRevenueStats, error)
+	GetDashboardMonthCountStats(ctx context.Context, input presenter.DashboardDayCountStatsQuery) ([]presenter.DashboardDayCountStats, error)
 
 }

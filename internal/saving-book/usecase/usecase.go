@@ -26,6 +26,7 @@ import (
 	transaction_ticket "SavingBooks/internal/transaction-ticket"
 	"SavingBooks/utils"
 	"github.com/jinzhu/copier"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 )
@@ -35,10 +36,178 @@ type savingBookUseCase struct {
 	ticketRepo     transaction_ticket.TransactionTicketRepository
 	paymentUC      payment.PaymentUseCase
 	notificationUC notification.UseCase
-	monthlyUC monthly_saving_interest.UseCase
+	monthlyUC      monthly_saving_interest.UseCase
 	kafkaProducer  *kafka2.KafkaProducer
-	cacheService *redis.Cache
-	socket *websocket.Hub
+	cacheService   *redis.Cache
+	socket         *websocket.Hub
+}
+
+func (s *savingBookUseCase) GetDashboardDayStats(ctx context.Context, input time.Time) ([]presenter.DashboardDayRevenueStats, error) {
+	collectionInterface := s.ticketRepo.GetCollection()
+	collection := collectionInterface.(*mongo.Collection)
+
+	startDay := time.Date(input.Year(), input.Month(), input.Day(), 0, 0, 0, 0, time.Local)
+	endDate := time.Date(input.Year(), input.Month(), input.Day()+1, 0, 0, 0, 0, time.Local)
+
+	pipeline := []bson.M{
+		{
+			"$match": bson.M{
+				"TransactionDate": bson.M{
+					"$gte": startDay,
+					"$lt": endDate,
+				},
+			},
+		},
+		{
+			"$group": bson.M{
+				"_id": bson.M{
+					"name":         "$Name",
+					"termInMonth":  "$TermInMonth",
+					"interestRate": "$InterestRate",
+				},
+				"income": bson.M{
+					"$sum": bson.M{
+						"$cond": bson.A{
+							bson.M{"$eq": bson.A{"$PaymentType", saving_book.TransactionTypeDeposit}},
+							"$PaymentAmount",
+							0,
+						},
+					},
+				},
+				"outcome": bson.M{
+					"$sum": bson.M{
+						"$cond": bson.A{
+							bson.M{"$eq": bson.A{"$PaymentType", saving_book.TransactionTypeWithdraw}},
+							"$PaymentAmount",
+							0,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	cursor, err := collection.Aggregate(ctx, pipeline)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+	var stats []presenter.DashboardDayRevenueStats
+	for cursor.Next(ctx) {
+		var doc struct {
+			ID struct {
+				Name         string `bson:"name"`
+				TermInMonth  int `bson:"termInMonth"`
+				InterestRate float64 `bson:"interestRate"`
+			} `bson:"_id"`
+			Income  float64 `bson:"income"`
+			Outcome float64 `bson:"outcome"`
+		}
+		if err := cursor.Decode(&doc); err != nil {
+			return nil, err
+		}
+
+		differentCount := doc.Income - doc.Outcome
+
+		stats = append(stats, presenter.DashboardDayRevenueStats{
+			RegulationType: fmt.Sprintf("%s - %d months at %.2f%% interest", doc.ID.Name, doc.ID.TermInMonth, doc.ID.InterestRate),
+			Income:         doc.Income,
+			Outcome:        doc.Outcome,
+			DifferentCount: differentCount,
+		})
+
+	}
+	if err := cursor.Err(); err != nil {
+		return nil, err
+	}
+	return stats, nil
+}
+
+func (s *savingBookUseCase) GetDashboardMonthCountStats(ctx context.Context, input presenter.DashboardDayCountStatsQuery) ([]presenter.DashboardDayCountStats, error) {
+	collectionInterface := s.savingBookRepo.GetCollection()
+	collection := collectionInterface.(*mongo.Collection)
+
+	startMonth := time.Date(input.Time.Year(), input.Time.Month(), 1, 0, 0, 0, 0, time.UTC)
+	endMonth := time.Date(input.Time.Year(), input.Time.Month()+1, 0, 23, 59, 59, 999999999, time.UTC)
+	objectId, err := primitive.ObjectIDFromHex(input.RegulationId)
+	pipeline := []bson.M{
+		{
+			"$match": bson.M{
+				"CreationTime": bson.M{
+					"$gte": startMonth,
+					"$lte": endMonth,
+				},
+				"Regulations.0.RegulationIdRef": objectId,
+				"Regulations.0.TermInMonth":     input.Term,
+				"Regulations.0.InterestRate":    input.InterestRate,
+			},
+		},
+		{
+			"$group": bson.M{
+				"_id": bson.M{
+					"year":  bson.M{"$year": "$CreationTime"},
+					"month": bson.M{"$month": "$CreationTime"},
+					"day":   bson.M{"$dayOfMonth": "$CreationTime"},
+				},
+				"closedCount": bson.M{
+					"$sum": bson.M{
+						"$cond": bson.A{
+							bson.M{"$eq": []interface{}{"$Status", saving_book.SavingBookClosed}},
+							1,
+							0,
+						},
+					},
+				},
+				"openCount": bson.M{
+					"$sum": bson.M{
+						"$cond": bson.A{
+							bson.M{"$ne": []interface{}{"$Status", saving_book.SavingBookClosed}},
+							1,
+							0,
+						},
+					},
+				},
+			},
+
+		},
+		{
+			"$sort": bson.M{"_id.year": 1, "_id.month": 1, "_id.day": 1},
+		},
+	}
+	cursor, err := collection.Aggregate(ctx, pipeline)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+	var stats []presenter.DashboardDayCountStats
+	for cursor.Next(ctx) {
+		var doc struct {
+			ID struct {
+				Year  int `bson:"year"`
+				Month int `bson:"month"`
+				Day   int `bson:"day"`
+			} `bson:"_id"`
+			OpenCount   int `bson:"openCount"`
+			ClosedCount int `bson:"closedCount"`
+		}
+		if err := cursor.Decode(&doc); err != nil {
+			return nil, err
+		}
+
+		currentDate := time.Date(doc.ID.Year, time.Month(doc.ID.Month), doc.ID.Day, 0, 0, 0, 0, time.Local)
+		differentCount := doc.OpenCount - doc.ClosedCount
+
+		stats = append(stats, presenter.DashboardDayCountStats{
+			CurrentDate:    currentDate,
+			OpenCount:      doc.OpenCount,
+			ClosedCount:    doc.ClosedCount,
+			DifferentCount: differentCount,
+		})
+	}
+	if err := cursor.Err(); err != nil {
+		return nil, err
+	}
+	return stats, nil
 }
 
 func (s *savingBookUseCase) DepositOnline(ctx context.Context, input *presenter.DepositInput, savingBookId, userId string) (*domain.TransactionTicket, error) {
@@ -56,12 +225,12 @@ func (s *savingBookUseCase) DepositOnline(ctx context.Context, input *presenter.
 	}
 	var lastReg domain.Regulation
 	for i := len(savingBook.Regulations) - 1; i >= 0; i-- {
-		if(savingBook.Regulations[i].ApplyDate != time.Time{}) {
+		if (savingBook.Regulations[i].ApplyDate != time.Time{}) {
 			lastReg = savingBook.Regulations[i]
 		}
 	}
 
-	if savingBook.Status != saving_book.SavingBookExpired || lastReg.TermInMonth !=0 {
+	if savingBook.Status != saving_book.SavingBookExpired || lastReg.TermInMonth != 0 {
 		return nil, errors.New(saving_book.CannotDepositError)
 	}
 
@@ -94,7 +263,7 @@ func (s *savingBookUseCase) DepositOnline(ctx context.Context, input *presenter.
 
 	savingBook.Regulations = append(savingBook.Regulations, *reg)
 	savingBook.Status = saving_book.SavingBookInit
-	savingBook.PendingBalance = input.Amount;
+	savingBook.PendingBalance = input.Amount
 	savingBook.SetSysUpdate()
 
 	resp, err := s.paymentUC.CreateOrder(ctx, &paypal.InitOrderRequest{
@@ -105,7 +274,7 @@ func (s *savingBookUseCase) DepositOnline(ctx context.Context, input *presenter.
 	if err != nil {
 		return nil, err
 	}
-	savingBook.PaymentUrl = resp.Links[1].Href;
+	savingBook.PaymentUrl = resp.Links[1].Href
 	ticket := &domain.TransactionTicket{
 		SavingBookId:    savingBook.Id,
 		TransactionDate: time.Time{},
@@ -115,6 +284,9 @@ func (s *savingBookUseCase) DepositOnline(ctx context.Context, input *presenter.
 		PaymentType:     saving_book.TransactionTypeDeposit,
 		PaymentId:       resp.Id,
 		PaymentAmount:   input.Amount,
+		Name:            selectedReq.Name,
+		InterestRate:    selectedReq.InterestRate,
+		TermInMonth:     selectedReq.Term,
 	}
 	ticket.SetCreate(userId)
 
@@ -127,7 +299,7 @@ func (s *savingBookUseCase) DepositOnline(ctx context.Context, input *presenter.
 		if err = session.StartTransaction(); err != nil {
 			return err
 		}
-		_, err = s.savingBookRepo.Update(ctx, savingBook, savingBook.Id.Hex(), []string{"Regulations", "Status","PendingBalance","PaymentUrl"})
+		_, err = s.savingBookRepo.Update(ctx, savingBook, savingBook.Id.Hex(), []string{"Regulations", "Status", "PendingBalance", "PaymentUrl"})
 		if err != nil {
 			_ = session.AbortTransaction(sessionContext)
 			return err
@@ -143,7 +315,7 @@ func (s *savingBookUseCase) DepositOnline(ctx context.Context, input *presenter.
 	if err != nil {
 		return nil, err
 	}
-	s.socket.SendOne(websocket.SavingBookTransactionComplete,savingBook.AccountId.Hex(), savingBook)
+	s.socket.SendOne(websocket.SavingBookTransactionComplete, savingBook.AccountId.Hex(), savingBook)
 	return ticket, nil
 }
 
@@ -169,15 +341,15 @@ func (s *savingBookUseCase) WithdrawOnline(ctx context.Context, input *presenter
 	}
 	var lastReg domain.Regulation
 	for i := len(savingBook.Regulations) - 1; i >= 0; i-- {
-		if(savingBook.Regulations[i].ApplyDate != time.Time{}) {
+		if (savingBook.Regulations[i].ApplyDate != time.Time{}) {
 			lastReg = savingBook.Regulations[i]
 		}
 	}
 	withDrawAmount := input.Amount
 
-	secondDiff := secondBetween(lastReg.ApplyDate,time.Now().Local())
+	secondDiff := secondBetween(lastReg.ApplyDate, time.Now().Local())
 
-	if lastReg.TermInMonth == 0  {
+	if lastReg.TermInMonth == 0 {
 		if secondDiff < lastReg.MinWithDrawDay {
 			return errors.New(saving_book.MinWithdrawDayError)
 		}
@@ -189,12 +361,12 @@ func (s *savingBookUseCase) WithdrawOnline(ctx context.Context, input *presenter
 		}
 		withDrawAmount = input.Amount
 
-	}else  {
+	} else {
 		if savingBook.Status != saving_book.SavingBookExpired {
 			return errors.New(saving_book.CannotWithdrawError)
 		}
 
-		withDrawAmount = math.Floor(savingBook.Balance*100)/100
+		withDrawAmount = math.Floor(savingBook.Balance*100) / 100
 	}
 
 	if savingBook.Regulations[len(savingBook.Regulations)-1].MinWithDrawValue > withDrawAmount {
@@ -256,7 +428,7 @@ func (s *savingBookUseCase) WithdrawOnline(ctx context.Context, input *presenter
 	if err != nil {
 		return err
 	}
-	s.socket.SendOne(websocket.SavingBookTransactionComplete,savingBook.AccountId.Hex(), savingBook)
+	s.socket.SendOne(websocket.SavingBookTransactionComplete, savingBook.AccountId.Hex(), savingBook)
 	return nil
 }
 
@@ -334,7 +506,7 @@ func (s *savingBookUseCase) ConfirmPaymentOnline(ctx context.Context, paymentId,
 		return err
 	}
 
-	if ticket.Status != transaction_ticket.TransactionStatusPending  && ticket.Status != transaction_ticket.TransactionStatusAbort{
+	if ticket.Status != transaction_ticket.TransactionStatusPending && ticket.Status != transaction_ticket.TransactionStatusAbort {
 		return errors.New(saving_book.TransactionTicketNotPendingStatus)
 	}
 
@@ -363,7 +535,7 @@ func (s *savingBookUseCase) ConfirmPaymentOnline(ctx context.Context, paymentId,
 		savingBook.Balance += ticket.PaymentAmount
 		savingBook.PendingBalance = 0
 		savingBook.PaymentUrl = ""
-		updateFields := []string{"Balance", "NextScheduleMonth", "PendingBalance","PaymentUrl"}
+		updateFields := []string{"Balance", "NextScheduleMonth", "PendingBalance", "PaymentUrl"}
 
 		if savingBook.Status != saving_book.SavingBookActive {
 			updateFields = append(updateFields, "Status")
@@ -379,7 +551,7 @@ func (s *savingBookUseCase) ConfirmPaymentOnline(ctx context.Context, paymentId,
 			}
 		}
 		//savingBook.NextScheduleMonth = time.Date(nextMonth.Year(), nextMonth.Month(), nextMonth.Day(), 0, 0, 0, 0, time.UTC)
-		savingBook.NextScheduleMonth = time.Date(nextMonth.Year(), nextMonth.Month(), nextMonth.Day(), nextMonth.Hour(), nextMonth.Minute() +1, nextMonth.Second(), 0, time.Local)
+		savingBook.NextScheduleMonth = time.Date(nextMonth.Year(), nextMonth.Month(), nextMonth.Day(), nextMonth.Hour(), nextMonth.Minute()+1, nextMonth.Second(), 0, time.Local)
 
 		_, err = s.savingBookRepo.Update(ctx, savingBook, savingBook.Id.Hex(), updateFields)
 
@@ -394,7 +566,7 @@ func (s *savingBookUseCase) ConfirmPaymentOnline(ctx context.Context, paymentId,
 		}
 		return session.CommitTransaction(ctx)
 	})
-	s.socket.SendOne(websocket.SavingBookTransactionComplete,savingBook.AccountId.Hex(), savingBook)
+	s.socket.SendOne(websocket.SavingBookTransactionComplete, savingBook.AccountId.Hex(), savingBook)
 	return nil
 }
 
@@ -477,6 +649,11 @@ func (s *savingBookUseCase) CreateSavingBookOnline(ctx context.Context, input *p
 			PaymentType:     saving_book.TransactionTypeDeposit,
 			PaymentId:       resp.Id,
 			PaymentAmount:   input.NewPaymentAmount,
+
+			Name:            selectedReq.Name,
+			InterestRate:    selectedReq.InterestRate,
+			TermInMonth:     selectedReq.Term,
+
 		}
 		ticket.SetCreate(creatorId)
 
@@ -532,7 +709,6 @@ func (s *savingBookUseCase) GetListSavingBook(ctx context.Context, query *contra
 		}
 	}
 
-
 	return savingBooksOutput, nil
 }
 
@@ -544,7 +720,7 @@ func (s *savingBookUseCase) revertBalanceAndNotify(ctx context.Context, input *e
 
 	savingBook.Balance += input.Amount
 	savingBook.Status = saving_book.SavingBookActive
-	if _, err := s.savingBookRepo.Update(ctx, savingBook, savingBook.Id.Hex(), []string{"Balance","Status"}); err != nil {
+	if _, err := s.savingBookRepo.Update(ctx, savingBook, savingBook.Id.Hex(), []string{"Balance", "Status"}); err != nil {
 		return fmt.Errorf("failed to revert saving book balance: %w", err)
 	}
 
@@ -561,6 +737,6 @@ func (s *savingBookUseCase) revertBalanceAndNotify(ctx context.Context, input *e
 	return nil
 }
 
-func NewSavingBookUseCase( savingBookRepo saving_book.SavingBookRepository, ticketRepo transaction_ticket.TransactionTicketRepository, paymentUC payment.PaymentUseCase, notificationUC notification.UseCase, monthlyUC monthly_saving_interest.UseCase,  kafkaProducer *kafka2.KafkaProducer, cacheService *redis.Cache, socket *websocket.Hub) saving_book.UseCase {
-	return &savingBookUseCase{ savingBookRepo: savingBookRepo, ticketRepo: ticketRepo, paymentUC: paymentUC, notificationUC: notificationUC, kafkaProducer: kafkaProducer, cacheService: cacheService, socket: socket, monthlyUC: monthlyUC}
+func NewSavingBookUseCase(savingBookRepo saving_book.SavingBookRepository, ticketRepo transaction_ticket.TransactionTicketRepository, paymentUC payment.PaymentUseCase, notificationUC notification.UseCase, monthlyUC monthly_saving_interest.UseCase, kafkaProducer *kafka2.KafkaProducer, cacheService *redis.Cache, socket *websocket.Hub) saving_book.UseCase {
+	return &savingBookUseCase{savingBookRepo: savingBookRepo, ticketRepo: ticketRepo, paymentUC: paymentUC, notificationUC: notificationUC, kafkaProducer: kafkaProducer, cacheService: cacheService, socket: socket, monthlyUC: monthlyUC}
 }

@@ -11,4 +11,8 @@ type Handler interface {
 	WithDrawOnline() gin.HandlerFunc
 	DepositOnline() gin.HandlerFunc
 
+	GetDailyRevenueReport() gin.HandlerFunc
+	GetMonthlyReport() gin.HandlerFunc
+
+
 }

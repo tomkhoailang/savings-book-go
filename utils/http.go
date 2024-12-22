@@ -246,8 +246,7 @@ func NewHandleGetListRequestNew[OutputEntity any](getListFunc func(ctx context.C
 }
 func HandleGetListRequestAuth[T any](getListFunc func(ctx context.Context, query *contracts.Query, authData *presenter.AuthData ) (*contracts.QueryResult[T], error)) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		var query contracts.Query
-		if err := c.ShouldBindQuery(&query); err != nil {
+		var query contracts.Query; if err := c.ShouldBindQuery(&query); err != nil {
 			c.JSON(400, gin.H{"error": err.Error()})
 			return
 		}

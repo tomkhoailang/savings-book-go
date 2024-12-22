@@ -191,6 +191,7 @@ func (s *Scheduler) handleSavingBook() {
 		}
 		newBalance := savingBook.Balance * (1 + (interestRate / 100))
 
+
 		updateDoc["Balance"] = newBalance
 
 		savingBookUpdate := mongo.NewUpdateOneModel().
@@ -205,6 +206,7 @@ func (s *Scheduler) handleSavingBook() {
 			Amount:       monthlyAmount,
 			InterestRate: interestRate,
 		}
+
 		monthlyInterest.SetInit()
 		monthlyUpdate := mongo.NewInsertOneModel().SetDocument(&monthlyInterest)
 		monthlyOperations = append(monthlyOperations, monthlyUpdate)

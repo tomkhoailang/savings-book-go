@@ -55,6 +55,7 @@ func (s *savingRegulationUseCase) UpdateRegulation(ctx context.Context, input *p
 
 func (s *savingRegulationUseCase) DeleteManyRegulations(ctx context.Context, deleterId string, input []string) error {
 	err := s.savingRegulationRepo.DeleteMany(ctx, deleterId, input)
+	_ = s.cacheService.RemoveValue(ctx, redis_key.LatestRegulation)
 	if err != nil {
 		return err
 	}

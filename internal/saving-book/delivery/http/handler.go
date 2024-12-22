@@ -3,6 +3,7 @@
 import (
 	"errors"
 	"net/http"
+	"time"
 
 	"SavingBooks/internal/contracts"
 	"SavingBooks/internal/domain"
@@ -22,6 +23,47 @@ type savingBookHandler struct {
 	savingBookUC saving_book.UseCase
 	ticketUc     transaction_ticket.UseCase
 	monthlyUC    monthly_saving_interest.UseCase
+}
+
+func (s *savingBookHandler) GetMonthlyReport() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		query := presenter.DashboardDayCountStatsQuery{}
+		if err := c.ShouldBindQuery(&query); err != nil {
+			c.JSON(400, gin.H{"error": err.Error()})
+			return
+		}
+		res, err := s.savingBookUC.GetDashboardMonthCountStats(c, query)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		c.JSON(http.StatusOK, res)
+	}
+}
+
+func (s *savingBookHandler) GetDailyRevenueReport() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		timeStr := c.Query("time")
+		if timeStr == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "time parameter is required"})
+			return
+		}
+
+		layout := "2006-01-02T15:04:05.000Z"
+		parsedTime, err := time.Parse(layout, timeStr)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid time format"})
+			return
+		}
+		res, err := s.savingBookUC.GetDashboardDayStats(c, parsedTime)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		c.JSON(http.StatusOK, res)
+	}
 }
 
 func (s *savingBookHandler) GetListSavingBook() gin.HandlerFunc {
