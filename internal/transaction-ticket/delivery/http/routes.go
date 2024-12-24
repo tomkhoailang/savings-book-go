@@ -9,4 +9,5 @@ import (
 func MapAuthRoutes(authGroup *gin.RouterGroup, t transaction_ticket.Handler, mw *middleware.MiddleWareManager) {
 	authGroup.Use(mw.JWTValidation())
 	authGroup.GET("", t.GetListTicket())
+	authGroup.GET("/:id", t.GetTicket())
 }
