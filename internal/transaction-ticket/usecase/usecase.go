@@ -2,6 +2,7 @@
 
 import (
 	"context"
+	"errors"
 
 	"SavingBooks/internal/auth/presenter"
 	"SavingBooks/internal/contracts"
@@ -15,6 +16,16 @@ type transactionTicketUseCase struct {
 	savingBookRepo saving_book.SavingBookRepository
 }
 
+func (t *transactionTicketUseCase) GetTransactionTicket(ctx context.Context, transactionTicketId string, auth *presenter.AuthData) (*domain.TransactionTicket, error) {
+	ticket, err := t.ticketRepo.Get(ctx, transactionTicketId)
+	if err != nil{
+		return nil, err
+	}
+	if ticket.Id.Hex() != auth.UserId {
+		return nil, errors.New("not saving book owner")
+	}
+	return ticket, nil
+}
 
 func (t *transactionTicketUseCase) GetListTransactionTicket(ctx context.Context, query *contracts.Query, auth *presenter.AuthData) (*contracts.QueryResult[domain.TransactionTicket], error) {
 	var ticketInterfaces interface{}

@@ -107,6 +107,7 @@ func (s *Scheduler) handleTransactionTicket() {
 		updateSavingBookDoc := bson.M{
 			"PendingBalance": 0,
 			"PaymentUrl": "",
+			"Status": saving_book.SavingBookExpired,
 		}
 		savingUpdate := mongo.NewUpdateOneModel().
 			SetFilter(bson.M{"_id": savingBook.Id, "PendingBalance": bson.M{"$gt": 0}}).

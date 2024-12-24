@@ -3,6 +3,7 @@
 import (
 	"net/http"
 
+	presenter2 "SavingBooks/internal/auth/presenter"
 	"SavingBooks/internal/contracts"
 	"SavingBooks/internal/domain"
 	transaction_ticket "SavingBooks/internal/transaction-ticket"
@@ -14,6 +15,45 @@ import (
 
 type transactionTicketHandler struct {
 	ticketUC transaction_ticket.UseCase
+}
+
+func (t *transactionTicketHandler) GetTicket() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var query contracts.Query
+		if err := c.ShouldBindQuery(&query); err != nil {
+			c.JSON(400, gin.H{"error": err.Error()})
+			return
+		}
+		roleNames, err := utils.GetRoles(c)
+		if err != nil {
+			c.JSON(400, gin.H{"error": err.Error()})
+			return
+		}
+		userId, err := utils.GetUserId(c)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		authData := &presenter2.AuthData{
+			UserId: userId,
+			Roles:  roleNames,
+		}
+		savingBookId := c.Param("id")
+		if savingBookId == "" {
+			c.JSON(http.StatusInternalServerError, gin.H{"err":"id can not be empty"})
+			return
+		}
+		res, err := t.ticketUC.GetTransactionTicket(c, savingBookId, authData)
+		if err != nil {
+			if err.Error() == "not saving book owner" {
+				c.JSON(http.StatusUnauthorized, gin.H{"err":"not saving book owner"})
+				return
+			}
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, res)
+	}
 }
 
 func (t *transactionTicketHandler) GetListTicket() gin.HandlerFunc {
