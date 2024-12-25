@@ -29,6 +29,10 @@ func (u *userHandler) DisableUser() gin.HandlerFunc {
 				c.JSON(404, gin.H{"err": "user not found"})
 				return
 			}
+			if err.Error() == "Admin couldn't be blocked" {
+				c.JSON(400, gin.H{"error": "Admin couldn't be blocked"})
+				return
+			}
 			c.JSON(500, gin.H{"err": err.Error()})
 			return
 		}
