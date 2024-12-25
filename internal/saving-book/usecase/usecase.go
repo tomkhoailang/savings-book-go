@@ -348,6 +348,7 @@ func (s *savingBookUseCase) WithdrawOnline(ctx context.Context, input *presenter
 	withDrawAmount := input.Amount
 
 	secondDiff := secondBetween(lastReg.ApplyDate, time.Now().Local())
+	isTerm := false
 
 	if lastReg.TermInMonth == 0 {
 		if secondDiff < lastReg.MinWithDrawDay {
@@ -365,7 +366,7 @@ func (s *savingBookUseCase) WithdrawOnline(ctx context.Context, input *presenter
 		if savingBook.Status != saving_book.SavingBookExpired {
 			return errors.New(saving_book.CannotWithdrawError)
 		}
-
+		isTerm = true
 		withDrawAmount = math.Floor(savingBook.Balance*100) / 100
 	}
 
@@ -373,7 +374,12 @@ func (s *savingBookUseCase) WithdrawOnline(ctx context.Context, input *presenter
 		return errors.New(saving_book.MinWithdrawValueError)
 	}
 	updatedSavingBookField := []string{"Balance"}
-	savingBook.Balance -= withDrawAmount
+
+	if isTerm {
+		savingBook.Balance = 0
+	}else {
+		savingBook.Balance -= withDrawAmount
+	}
 	if savingBook.Balance == 0 {
 		updatedSavingBookField = append(updatedSavingBookField, "Status")
 		savingBook.Status = saving_book.SavingBookClosed
@@ -385,7 +391,7 @@ func (s *savingBookUseCase) WithdrawOnline(ctx context.Context, input *presenter
 		Status:          transaction_ticket.TransactionStatusPending,
 		Email:           input.Email,
 		PaymentType:     saving_book.TransactionTypeWithdraw,
-		PaymentAmount:   input.Amount,
+		PaymentAmount:   withDrawAmount,
 	}
 	ticket.SetCreate(userId)
 

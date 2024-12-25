@@ -18,10 +18,10 @@ type transactionTicketUseCase struct {
 
 func (t *transactionTicketUseCase) GetTransactionTicket(ctx context.Context, transactionTicketId string, auth *presenter.AuthData) (*domain.TransactionTicket, error) {
 	ticket, err := t.ticketRepo.Get(ctx, transactionTicketId)
-	if err != nil{
+	if err != nil {
 		return nil, err
 	}
-	if ticket.Id.Hex() != auth.UserId {
+	if ticket.CreatorId.Hex() != auth.UserId {
 		return nil, errors.New("not saving book owner")
 	}
 	return ticket, nil
@@ -45,19 +45,25 @@ func (t *transactionTicketUseCase) GetListTransactionTicket(ctx context.Context,
 	return savingBooks, nil
 }
 
-func (t *transactionTicketUseCase) GetListTransactionTicketOfSavingBook(ctx context.Context, query *contracts.Query, userId , savingBookId string) (*contracts.QueryResult[domain.TransactionTicket], error) {
+func (t *transactionTicketUseCase) GetListTransactionTicketOfSavingBook(ctx context.Context, query *contracts.Query, auth *presenter.AuthData, savingBookId string) (*contracts.QueryResult[domain.TransactionTicket], error) {
 	var ticketInterfaces interface{}
 	var err error
-	ticketInterfaces, err = t.ticketRepo.GetListAuthOnReference(ctx, query, userId,"SavingBookId", savingBookId)
-	if err != nil {
+
+	if _, ok := auth.Roles["Admin"]; ok {
+		ticketInterfaces, err = t.ticketRepo.GetListOnReference(ctx, query, "SavingBookId", savingBookId)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		ticketInterfaces, err = t.ticketRepo.GetListAuthOnReference(ctx, query, auth.UserId, "SavingBookId", savingBookId)
 		return nil, err
+
 	}
 
 	tickets := ticketInterfaces.(*contracts.QueryResult[domain.TransactionTicket])
 	return tickets, nil
 }
 
-
-func NewTransactionTicketUseCase( ticketRepo transaction_ticket.TransactionTicketRepository, savingBookRepo saving_book.SavingBookRepository) transaction_ticket.UseCase {
-	return &transactionTicketUseCase{ ticketRepo: ticketRepo, savingBookRepo: savingBookRepo}
+func NewTransactionTicketUseCase(ticketRepo transaction_ticket.TransactionTicketRepository, savingBookRepo saving_book.SavingBookRepository) transaction_ticket.UseCase {
+	return &transactionTicketUseCase{ticketRepo: ticketRepo, savingBookRepo: savingBookRepo}
 }

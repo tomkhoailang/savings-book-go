@@ -6,10 +6,10 @@ import (
 )
 
 type Query struct {
-	Skip    int    `json:"skip" `
-	Max     int    `json:"max" validate:"max=100"`
-	Keyword string `json:"keyword"`
-	Sort    string `json:"sort"`
+	Skip    int    `form:"skip" `
+	Max     int    `form:"max" validate:"max=100"`
+	Keyword string `form:"keyword"`
+	Sort    string `form:"sort"`
 }
 
 func(query *Query) QueryBuilder() (bson.M, *options.FindOptions) {

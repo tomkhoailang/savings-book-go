@@ -186,9 +186,8 @@ func (s *Scheduler) handleSavingBook() {
 		if monthRange >= newestRegulation.TermInMonth {
 			if savingBook.Status != saving_book.SavingBookExpired && savingBook.Status != saving_book.SavingBookInit {
 				updateDoc["Status"] = saving_book.SavingBookExpired
-			} else {
-				interestRate = newestRegulation.NoTermInterestRate
 			}
+			interestRate = newestRegulation.NoTermInterestRate
 		}
 		newBalance := savingBook.Balance * (1 + (interestRate / 100))
 

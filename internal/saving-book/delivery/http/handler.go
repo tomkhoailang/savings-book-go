@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"time"
 
+	presenter4 "SavingBooks/internal/auth/presenter"
 	"SavingBooks/internal/contracts"
 	"SavingBooks/internal/domain"
 	monthly_saving_interest "SavingBooks/internal/monthly-saving-interest"
@@ -77,19 +78,28 @@ func (s *savingBookHandler) GetTicketsOfSavingBook() gin.HandlerFunc {
 			c.JSON(400, gin.H{"error": err.Error()})
 			return
 		}
-		userId, err := utils.GetUserId(c)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
 		savingBookId := c.Param("id")
 		if savingBookId == "" {
 			c.JSON(http.StatusInternalServerError, gin.H{"err": "id can not be empty"})
 			return
 		}
 
+		roleNames, err := utils.GetRoles(c)
+		if err != nil {
+			c.JSON(400, gin.H{"error": err.Error()})
+			return
+		}
+		userId, err := utils.GetUserId(c)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		authData := &presenter4.AuthData{
+			UserId: userId,
+			Roles:  roleNames,
+		}
 		var output contracts.QueryResult[presenter2.TransactionTicketOutput]
-		res, err := s.ticketUc.GetListTransactionTicketOfSavingBook(c, &query, userId, savingBookId)
+		res, err := s.ticketUc.GetListTransactionTicketOfSavingBook(c, &query, authData, savingBookId)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
