@@ -723,9 +723,12 @@ func (s *savingBookUseCase) revertBalanceAndNotify(ctx context.Context, input *e
 	if err != nil {
 		return fmt.Errorf("failed to get saving book: %w", err)
 	}
-
+	if savingBook.Balance == 0 {
+		savingBook.Status = saving_book.SavingBookExpired
+	}else {
+		savingBook.Status = saving_book.SavingBookActive
+	}
 	savingBook.Balance += input.Amount
-	savingBook.Status = saving_book.SavingBookActive
 	if _, err := s.savingBookRepo.Update(ctx, savingBook, savingBook.Id.Hex(), []string{"Balance", "Status"}); err != nil {
 		return fmt.Errorf("failed to revert saving book balance: %w", err)
 	}
