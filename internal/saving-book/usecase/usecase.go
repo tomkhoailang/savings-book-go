@@ -46,8 +46,15 @@ func (s *savingBookUseCase) GetDashboardDayStats(ctx context.Context, input time
 	collectionInterface := s.ticketRepo.GetCollection()
 	collection := collectionInterface.(*mongo.Collection)
 
-	startDay := time.Date(input.Year(), input.Month(), input.Day(), 0, 0, 0, 0, time.Local)
-	endDate := time.Date(input.Year(), input.Month(), input.Day()+1, 0, 0, 0, 0, time.Local)
+	location, err := time.LoadLocation("Asia/Jakarta")
+	if err != nil {
+		return nil, fmt.Errorf("failed to load location: %w", err)
+	}
+	inputGMT7 := input.In(location)
+
+
+	startDay := time.Date(inputGMT7.Year(), inputGMT7.Month(), inputGMT7.Day(), 0, 0, 0, 0, time.UTC)
+	endDate := time.Date(inputGMT7.Year(), inputGMT7.Month(), inputGMT7.Day()+1, 0, 0, 0, 0, time.UTC)
 
 	pipeline := []bson.M{
 		{
