@@ -183,7 +183,7 @@ func (s *Scheduler) handleSavingBook() {
 			"NextScheduleMonth": time.Date(now.Year(), now.Month(), now.Day(), now.Hour(), now.Minute()+1, now.Second(), 0, time.Local),
 		}
 
-		if monthRange >= newestRegulation.TermInMonth {
+		if monthRange >= newestRegulation.TermInMonth && newestRegulation.TermInMonth !=0 {
 			if savingBook.Status != saving_book.SavingBookExpired && savingBook.Status != saving_book.SavingBookInit {
 				updateDoc["Status"] = saving_book.SavingBookExpired
 			}
