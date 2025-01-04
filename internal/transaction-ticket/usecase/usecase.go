@@ -56,8 +56,9 @@ func (t *transactionTicketUseCase) GetListTransactionTicketOfSavingBook(ctx cont
 		}
 	} else {
 		ticketInterfaces, err = t.ticketRepo.GetListAuthOnReference(ctx, query, auth.UserId, "SavingBookId", savingBookId)
-		return nil, err
-
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	tickets := ticketInterfaces.(*contracts.QueryResult[domain.TransactionTicket])

@@ -91,7 +91,7 @@ func (u *userUseCase) DisableUser(ctx context.Context, userId string) error {
 
 	user.IsActive = !user.IsActive
 	if !user.IsActive {
-		err = u.cacheService.SetValueWithExpire(ctx, redis_key.BlockUserId+":"+userId, user.Id, 5*time.Minute)
+		err = u.cacheService.SetValueWithExpire(ctx, redis_key.BlockUserId+":"+userId, user.Id, 24*time.Hour)
 		if err != nil {
 			return err
 		}

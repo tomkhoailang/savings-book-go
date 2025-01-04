@@ -165,7 +165,7 @@ func (a *authUserCase) SignUp(ctx context.Context, creds presenter.SignUpInput) 
 	if err != nil {
 		return nil, err
 	}
-	if count == 0 {
+	if count == 0 || errors.Is(err, mongo.ErrNoDocuments) {
 		roleT, ierr := a.roleRepo.GetByField(ctx, "Name", "Admin")
 		if ierr != nil {
 			return nil, ierr

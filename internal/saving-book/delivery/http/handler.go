@@ -104,11 +104,14 @@ func (s *savingBookHandler) GetTicketsOfSavingBook() gin.HandlerFunc {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
-		err = copier.Copy(&output, res)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
+		if res.Items != nil {
+			err = copier.Copy(&output, res)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
 		}
+
 		c.JSON(http.StatusOK, output)
 	}
 }
