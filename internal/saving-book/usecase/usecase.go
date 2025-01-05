@@ -166,13 +166,7 @@ func (s *savingBookUseCase) GetDashboardMonthCountStats(ctx context.Context, inp
 					},
 				},
 				"openCount": bson.M{
-					"$sum": bson.M{
-						"$cond": bson.A{
-							bson.M{"$ne": []interface{}{"$Status", saving_book.SavingBookClosed}},
-							1,
-							0,
-						},
-					},
+					"$sum": 1,
 				},
 			},
 
@@ -237,7 +231,7 @@ func (s *savingBookUseCase) DepositOnline(ctx context.Context, input *presenter.
 		}
 	}
 
-	if savingBook.Status != saving_book.SavingBookExpired || lastReg.TermInMonth != 0 {
+	if  savingBook.Status != saving_book.SavingBookExpired && lastReg.TermInMonth != 0   {
 		return nil, errors.New(saving_book.CannotDepositError)
 	}
 
@@ -560,7 +554,7 @@ func (s *savingBookUseCase) ConfirmPaymentOnline(ctx context.Context, paymentId,
 
 			if lastReg.ApplyDate.IsZero() {
 				updateFields = append(updateFields, "Regulations")
-				lastReg.ApplyDate = time.Now()
+				lastReg.ApplyDate = time.Now().Local()
 			}
 		}
 		//savingBook.NextScheduleMonth = time.Date(nextMonth.Year(), nextMonth.Month(), nextMonth.Day(), 0, 0, 0, 0, time.UTC)

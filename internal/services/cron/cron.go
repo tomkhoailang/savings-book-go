@@ -150,7 +150,7 @@ func (s *Scheduler) handleSavingBook() {
 	filter := bson.M{
 		"NextScheduleMonth": filterDate,
 		"Balance":           bson.M{"$gt": 0},
-		"Status":            bson.M{"$ne": "closed"},
+		"Status":            bson.M{"$ne": []string{"closed", saving_book.SavingBookInit}},
 	}
 
 	cursor, err := savingBookCollection.Find(context.Background(), filter)
@@ -176,7 +176,10 @@ func (s *Scheduler) handleSavingBook() {
 		}
 		newestRegulation := savingBook.Regulations[len(savingBook.Regulations)-1]
 
-		monthRange := minutesBetween(newestRegulation.ApplyDate, now)
+		location, _ := time.LoadLocation("Asia/Jakarta")
+
+		inputGMT7 := newestRegulation.ApplyDate.In(location)
+		monthRange := minutesBetween(inputGMT7, now)
 		interestRate := newestRegulation.InterestRate
 		updateDoc := bson.M{
 			//"NextScheduleMonth": now.AddDate(0, 1, 0).Truncate(24 * time.Hour),
@@ -184,7 +187,7 @@ func (s *Scheduler) handleSavingBook() {
 		}
 
 		if monthRange >= newestRegulation.TermInMonth && newestRegulation.TermInMonth !=0 {
-			if savingBook.Status != saving_book.SavingBookExpired && savingBook.Status != saving_book.SavingBookInit {
+			if savingBook.Status != saving_book.SavingBookExpired  {
 				updateDoc["Status"] = saving_book.SavingBookExpired
 			}
 			interestRate = newestRegulation.NoTermInterestRate
@@ -343,6 +346,9 @@ func monthsBetween(start, end time.Time) int {
 	return yearDiff*12 + monthDiff
 }
 func minutesBetween(start, end time.Time) int {
+	start = start.Truncate(time.Second)
+	end = end.Truncate(time.Second)
+
 	duration := end.Sub(start)
 	return int(duration.Minutes())
 }
