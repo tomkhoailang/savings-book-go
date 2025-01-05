@@ -393,6 +393,9 @@ func (s *savingBookUseCase) WithdrawOnline(ctx context.Context, input *presenter
 		Email:           input.Email,
 		PaymentType:     saving_book.TransactionTypeWithdraw,
 		PaymentAmount:   withDrawAmount,
+		TermInMonth: lastReg.TermInMonth,
+		Name: lastReg.Name,
+		InterestRate: lastReg.InterestRate,
 	}
 	ticket.SetCreate(userId)
 
