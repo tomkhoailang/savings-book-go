@@ -1,0 +1,15 @@
+﻿services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ./:/app
+    ports:
+      - "44342:8080"
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    external: true
